@@ -822,8 +822,6 @@ new #[Title('Equipos')] class extends Component {
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
             <nav class="mb-1 flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-400">
-                <a href="{{ route('dashboard') }}" wire:navigate class="transition hover:text-lima">Escritorio</a>
-                <flux:icon name="chevron-right" variant="micro" class="size-3" />
                 <span class="text-zinc-500 dark:text-zinc-400">Equipos</span>
             </nav>
 

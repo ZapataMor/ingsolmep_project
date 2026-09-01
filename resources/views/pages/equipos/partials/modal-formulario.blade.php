@@ -8,7 +8,7 @@
     x-cloak
     x-show="$wire.mostrarFormulario"
     x-transition.opacity.duration.200ms
-    x-effect="document.body.style.overflow = $wire.mostrarFormulario ? 'hidden' : ''"
+    {{-- El bloqueo del scroll del cuerpo lo lleva `modal-detalle`, que observa los tres modales a la vez. --}}
     x-on:keydown.escape.window="$wire.mostrarFormulario && $wire.cerrarFormulario()"
     class="fixed inset-0 z-50 overflow-y-auto bg-carbon-deep/70 p-3 backdrop-blur-sm sm:p-6"
     role="dialog"

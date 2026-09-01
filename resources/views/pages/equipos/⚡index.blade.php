@@ -156,6 +156,45 @@ new #[Title('Equipos')] class extends Component {
 
     public ?int $equipoAEliminar = null;
 
+    // ------------------------------------------------------------------
+    // Vistas de sólo lectura
+    // ------------------------------------------------------------------
+
+    public ?int $equipoVisto = null;
+
+    public string $listadoVisto = '';
+
+    /**
+     * Listados de sólo lectura que abren las tarjetas de indicadores.
+     *
+     * @var array<string, array{titulo: string, descripcion: string, icono: string}>
+     */
+    public const LISTADOS = [
+        'total' => [
+            'titulo' => 'Equipos registrados',
+            'descripcion' => 'Todo el inventario, asignado o en bodega.',
+            'icono' => 'cpu-chip',
+        ],
+        'activos' => [
+            'titulo' => 'Equipos en servicio',
+            'descripcion' => 'Equipos operativos y disponibles para uso clínico.',
+            'icono' => 'check-badge',
+        ],
+        'fueraDeServicio' => [
+            'titulo' => 'Equipos fuera de servicio',
+            'descripcion' => 'Equipos dados de baja temporal o pendientes de intervención.',
+            'icono' => 'bolt-slash',
+        ],
+        'sinAsignar' => [
+            'titulo' => 'Equipos sin asignar',
+            'descripcion' => 'Inventario maestro todavía sin empresa ni área.',
+            'icono' => 'rectangle-stack',
+        ],
+    ];
+
+    /** Máximo de filas que muestra el modal de listado antes de recortar. */
+    public const TOPE_LISTADO = 100;
+
     public function mount(): void
     {
         $this->reiniciarFormulario();
@@ -279,6 +318,42 @@ new #[Title('Equipos')] class extends Component {
         return Empresa::find($this->empresa_id)?->nombre;
     }
 
+    /** Equipo abierto en la vista de detalle, con sus relaciones cargadas. */
+    #[Computed]
+    public function equipoDetalle(): ?Equipo
+    {
+        if ($this->equipoVisto === null) {
+            return null;
+        }
+
+        return Equipo::with(['empresa', 'area', 'marca', 'modelo'])->find($this->equipoVisto);
+    }
+
+    /**
+     * Equipos que muestra el modal de una tarjeta de indicadores.
+     *
+     * @return Collection<int, Equipo>
+     */
+    #[Computed]
+    public function listadoEquipos(): Collection
+    {
+        if ($this->listadoVisto === '') {
+            return collect();
+        }
+
+        return $this->consultaDelListado()
+            ->with(['empresa', 'area', 'marca', 'modelo'])
+            ->orderBy('descripcion')
+            ->limit(self::TOPE_LISTADO)
+            ->get();
+    }
+
+    #[Computed]
+    public function listadoTotal(): int
+    {
+        return $this->listadoVisto === '' ? 0 : $this->consultaDelListado()->count();
+    }
+
     #[Computed]
     public function hayFiltrosActivos(): bool
     {
@@ -360,6 +435,34 @@ new #[Title('Equipos')] class extends Component {
     }
 
     // ------------------------------------------------------------------
+    // Vistas de sólo lectura
+    // ------------------------------------------------------------------
+
+    public function verEquipo(int $id): void
+    {
+        $this->equipoVisto = $id;
+    }
+
+    public function cerrarDetalle(): void
+    {
+        $this->equipoVisto = null;
+    }
+
+    public function verListado(string $tipo): void
+    {
+        if (! array_key_exists($tipo, self::LISTADOS)) {
+            return;
+        }
+
+        $this->listadoVisto = $tipo;
+    }
+
+    public function cerrarListado(): void
+    {
+        $this->listadoVisto = '';
+    }
+
+    // ------------------------------------------------------------------
     // Asistente
     // ------------------------------------------------------------------
 
@@ -372,6 +475,10 @@ new #[Title('Equipos')] class extends Component {
     public function editar(int $id): void
     {
         $equipo = Equipo::with(['area', 'marca', 'modelo'])->findOrFail($id);
+
+        // Editar desde la vista de detalle la reemplaza por el asistente.
+        $this->equipoVisto = null;
+        $this->listadoVisto = '';
 
         $this->reiniciarFormulario();
 
@@ -582,6 +689,21 @@ new #[Title('Equipos')] class extends Component {
     // ------------------------------------------------------------------
 
     /**
+     * Consulta base del listado que abre cada tarjeta de indicadores.
+     *
+     * @return Builder<Equipo>
+     */
+    private function consultaDelListado(): Builder
+    {
+        return match ($this->listadoVisto) {
+            'activos' => Equipo::query()->where('activo', true),
+            'fueraDeServicio' => Equipo::query()->where('activo', false),
+            'sinAsignar' => Equipo::query()->whereNull('empresa_id'),
+            default => Equipo::query(),
+        };
+    }
+
+    /**
      * Campos cuyo nombre coincide en el formulario y en la tabla.
      *
      * @return list<string>
@@ -720,25 +842,32 @@ new #[Title('Equipos')] class extends Component {
     {{-- ───────────────── Indicadores ───────────────── --}}
     @php
         $tarjetas = [
-            ['etiqueta' => 'Equipos registrados', 'valor' => $this->resumen['total'], 'icono' => 'cpu-chip', 'color' => 'from-signal to-signal-600', 'sombra' => 'shadow-signal/25'],
-            ['etiqueta' => 'En servicio', 'valor' => $this->resumen['activos'], 'icono' => 'check-badge', 'color' => 'from-lima to-lima-700', 'sombra' => 'shadow-lima/25'],
-            ['etiqueta' => 'Fuera de servicio', 'valor' => $this->resumen['fueraDeServicio'], 'icono' => 'bolt-slash', 'color' => 'from-rose-500 to-rose-600', 'sombra' => 'shadow-rose-500/25'],
-            ['etiqueta' => 'Sin asignar', 'valor' => $this->resumen['sinAsignar'], 'icono' => 'rectangle-stack', 'color' => 'from-amber-400 to-amber-600', 'sombra' => 'shadow-amber-500/25'],
+            ['tipo' => 'total', 'etiqueta' => 'Equipos registrados', 'valor' => $this->resumen['total'], 'icono' => 'cpu-chip', 'color' => 'from-signal to-signal-600', 'sombra' => 'shadow-signal/25'],
+            ['tipo' => 'activos', 'etiqueta' => 'En servicio', 'valor' => $this->resumen['activos'], 'icono' => 'check-badge', 'color' => 'from-lima to-lima-700', 'sombra' => 'shadow-lima/25'],
+            ['tipo' => 'fueraDeServicio', 'etiqueta' => 'Fuera de servicio', 'valor' => $this->resumen['fueraDeServicio'], 'icono' => 'bolt-slash', 'color' => 'from-rose-500 to-rose-600', 'sombra' => 'shadow-rose-500/25'],
+            ['tipo' => 'sinAsignar', 'etiqueta' => 'Sin asignar', 'valor' => $this->resumen['sinAsignar'], 'icono' => 'rectangle-stack', 'color' => 'from-amber-400 to-amber-600', 'sombra' => 'shadow-amber-500/25'],
         ];
     @endphp
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         @foreach ($tarjetas as $tarjeta)
-            <div class="eq-panel flex items-center gap-4 p-4 transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+            <button
+                type="button"
+                wire:click="verListado('{{ $tarjeta['tipo'] }}')"
+                title="Ver el listado de {{ mb_strtolower($tarjeta['etiqueta']) }}"
+                class="eq-panel group flex w-full cursor-pointer items-center gap-4 p-4 text-left transition duration-300 outline-none hover:-translate-y-1 hover:shadow-lg focus-visible:ring-4 focus-visible:ring-lima/30"
+            >
                 <span class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br {{ $tarjeta['color'] }} text-white shadow-lg {{ $tarjeta['sombra'] }}">
                     <flux:icon name="{{ $tarjeta['icono'] }}" class="size-6" />
                 </span>
 
-                <div>
+                <div class="min-w-0 flex-1">
                     <p class="text-[11.5px] font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{{ $tarjeta['etiqueta'] }}</p>
                     <p class="text-2xl font-bold text-carbon dark:text-white">{{ $tarjeta['valor'] }}</p>
                 </div>
-            </div>
+
+                <flux:icon name="chevron-right" variant="mini" class="size-4 shrink-0 text-zinc-300 transition duration-300 group-hover:translate-x-0.5 group-hover:text-lima dark:text-zinc-600" />
+            </button>
         @endforeach
     </div>
 
@@ -888,7 +1017,14 @@ new #[Title('Equipos')] class extends Component {
 
                 <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
                     @forelse ($this->equipos as $equipo)
-                        <tr wire:key="equipo-{{ $equipo->id }}" class="transition duration-150 hover:bg-lima-soft/40 dark:hover:bg-zinc-800/50">
+                        <tr
+                            wire:key="equipo-{{ $equipo->id }}"
+                            wire:click="verEquipo({{ $equipo->id }})"
+                            tabindex="0"
+                            wire:keydown.enter="verEquipo({{ $equipo->id }})"
+                            title="Ver la ficha de {{ $equipo->descripcion }}"
+                            class="cursor-pointer transition duration-150 outline-none hover:bg-lima-soft/40 focus-visible:bg-lima-soft/60 dark:hover:bg-zinc-800/50 dark:focus-visible:bg-zinc-800/70"
+                        >
                             <td class="px-4 py-3 align-top font-mono text-[12px] text-zinc-400">{{ $equipo->id }}</td>
 
                             <td class="px-4 py-3 align-top">
@@ -933,7 +1069,7 @@ new #[Title('Equipos')] class extends Component {
                             <td class="px-4 py-3 align-top">
                                 <button
                                     type="button"
-                                    wire:click="alternarActivo({{ $equipo->id }})"
+                                    wire:click.stop="alternarActivo({{ $equipo->id }})"
                                     title="Cambiar estado"
                                     @class([
                                         'eq-chip cursor-pointer transition duration-200 hover:scale-110 hover:shadow-md',
@@ -951,11 +1087,11 @@ new #[Title('Equipos')] class extends Component {
                             </td>
 
                             <td class="px-4 py-3 text-right align-top whitespace-nowrap">
-                                <button type="button" class="eq-icon-btn" title="Editar" wire:click="editar({{ $equipo->id }})">
+                                <button type="button" class="eq-icon-btn" title="Editar" wire:click.stop="editar({{ $equipo->id }})">
                                     <flux:icon name="pencil-square" variant="mini" class="size-4" />
                                 </button>
 
-                                <button type="button" class="eq-icon-btn hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!bg-rose-500/10" title="Eliminar" wire:click="confirmarEliminacion({{ $equipo->id }})">
+                                <button type="button" class="eq-icon-btn hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!bg-rose-500/10" title="Eliminar" wire:click.stop="confirmarEliminacion({{ $equipo->id }})">
                                     <flux:icon name="trash" variant="mini" class="size-4" />
                                 </button>
                             </td>
@@ -1003,5 +1139,14 @@ new #[Title('Equipos')] class extends Component {
         'areasSugeridas' => $this->areasDeEmpresa,
         'nombreEmpresa' => $this->nombreEmpresaSeleccionada,
     ])
+    @include('pages.equipos.partials.modal-detalle', ['equipo' => $this->equipoDetalle])
+
+    @include('pages.equipos.partials.modal-listado', [
+        'listados' => $this::LISTADOS,
+        'equiposListados' => $this->listadoEquipos,
+        'totalListado' => $this->listadoTotal,
+        'topeListado' => $this::TOPE_LISTADO,
+    ])
+
     @include('pages.equipos.partials.modal-eliminar')
 </section>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; background: #F2F4F1; font-family: "IBM Plex Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #5A8F2B; }
+  a:hover { color: #3A3B3D; }
+  [data-field]::placeholder { color: #9DA29A; }
+  @keyframes ing-sweep { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+  @keyframes ing-bar { 0% { transform: translateX(-110%); } 100% { transform: translateX(300%); } }
+  @media (prefers-reduced-motion: reduce) {
+    [data-sweep] { animation: none !important; opacity: 0 !important; }
+    [data-bar] { animation: none !important; transform: none !important; width: 100% !important; opacity: .45; }
+  }
+  @media (max-width: 880px) {
+    [data-zone="graphic"] { display: none !important; }
+    [data-stage] { padding: 52px 24px 120px !important; align-items: flex-start !important; }
+    [data-card] { width: 100% !important; max-width: 440px; border: 0 !important; background: transparent !important; padding: 0 !important; }
+    [data-msignal] { display: block !important; }
+    [data-field] { height: 52px !important; }
+    [data-submit] { height: 54px !important; }
+    [data-footer] { left: 24px !important; }
+  }
+</style>
+</helmet>
+
+<div style="position:relative;min-height:100vh;background:#F2F4F1;overflow:hidden;">
+
+  <div data-zone="graphic" aria-hidden="true" style="position:absolute;inset:0;clip-path:polygon(42% 0%, 100% 0%, 100% 100%, 24% 100%);background-color:#23262A;background-image:repeating-linear-gradient(to right, rgba(255,255,255,0.028) 0 1px, transparent 1px 16px),repeating-linear-gradient(to bottom, rgba(255,255,255,0.028) 0 1px, transparent 1px 16px),repeating-linear-gradient(to right, rgba(255,255,255,0.075) 0 1px, transparent 1px 80px),repeating-linear-gradient(to bottom, rgba(255,255,255,0.075) 0 1px, transparent 1px 80px);">
+    <div style="position:absolute;inset:0;clip-path:polygon(74% 0%, 100% 0%, 100% 100%, 56% 100%);background:rgba(255,255,255,0.035);"></div>
+    <div style="position:absolute;inset:0;clip-path:polygon(78% 62%, 100% 62%, 100% 100%, 71.2% 100%);background:rgba(140,198,63,0.085);"></div>
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;">
+      <line x1="866" y1="96" x2="866" y2="812" stroke="#8CC63F" stroke-opacity="0.42" stroke-width="1.2" />
+      <path id="ing-trace" pathLength="1000" d="M 60 470 H 300 c 14 0 18 -22 30 -22 c 12 0 16 22 30 22 H 404 l 10 12 l 12 -168 l 14 210 l 12 -54 H 500 c 22 0 26 -40 52 -40 c 26 0 30 40 52 40 H 740 c 14 0 18 -22 30 -22 c 12 0 16 22 30 22 H 844 l 10 12 l 12 -168 l 14 210 l 12 -54 H 940 c 22 0 26 -40 52 -40 c 26 0 30 40 52 40 H 1180 c 14 0 18 -22 30 -22 c 12 0 16 22 30 22 H 1284 l 10 12 l 12 -168 l 14 210 l 12 -54 H 1380 c 22 0 26 -40 52 -40 c 26 0 30 40 52 40 H 1560" fill="none" stroke="#29ABE2" stroke-opacity="0.5" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
+      <sc-if value="{{ motion }}" hint-placeholder-val="{{ true }}">
+        <use data-sweep href="#ing-trace" stroke="#29ABE2" stroke-opacity="1" stroke-width="2.6" style="stroke-dasharray:150 850;animation:ing-sweep 14s linear infinite;" />
+      </sc-if>
+      <circle cx="866" cy="314" r="5.5" fill="#8CC63F" />
+    </svg>
+  </div>
+
+  <div data-stage style="position:relative;min-height:100vh;box-sizing:border-box;display:flex;align-items:center;padding:64px 0 64px 8%;">
+
+    <form data-card novalidate="novalidate" onSubmit="{{ submit }}" style="position:relative;z-index:1;width:460px;box-sizing:border-box;background:#FFFFFF;border:1px solid #DCE0D8;border-radius:2px;padding:46px 46px 42px;display:flex;flex-direction:column;gap:0;">
+
+      <svg data-msignal viewBox="0 0 220 40" aria-hidden="true" style="display:none;width:132px;height:34px;margin-bottom:18px;">
+        <path d="M 0 26 H 58 l 7 8 l 8 -26 l 9 34 l 8 -16 H 118 c 12 0 14 -14 28 -14 c 14 0 16 14 28 14 H 220" fill="none" stroke="#29ABE2" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" />
+      </svg>
+
+      <sc-if value="{{ split }}" hint-placeholder-val="{{ true }}">
+        <h1 style="margin:0;font-size:34px;font-weight:600;letter-spacing:-0.02em;line-height:1.05;"><span style="color:#8CC63F;">INGS</span><span style="color:#3A3B3D;">OLMEP</span></h1>
+      </sc-if>
+      <sc-if value="{{ solid }}">
+        <h1 style="margin:0;font-size:34px;font-weight:600;letter-spacing:-0.02em;line-height:1.05;color:#3A3B3D;">INGSOLMEP</h1>
+      </sc-if>
+      <p style="margin:10px 0 0;font-size:14px;line-height:1.45;color:#58595B;">Sistema de Gestión de Equipos Médicos</p>
+
+      <div style="height:1px;background:#E7EAE4;margin:30px 0 28px;"></div>
+
+      <sc-if value="{{ hasError }}">
+        <div role="alert" style="margin:0 0 22px;padding:12px 14px;background:#FAF0EE;border:1px solid #E3C8C3;border-radius:2px;font-size:13px;line-height:1.5;color:#8A2F26;text-wrap:pretty;">{{ error }}</div>
+      </sc-if>
+
+      <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label for="ing-user" style="font-size:13.5px;font-weight:500;color:#3A3B3D;">Usuario</label>
+          <input data-field id="ing-user" name="usuario" type="text" autoComplete="username" autoCapitalize="none" spellCheck="false" placeholder="nombre.apellido" style="width:100%;box-sizing:border-box;height:48px;padding:0 14px;background:#F2F4F1;border:1px solid #DCE0D8;border-bottom:2px solid #DCE0D8;border-radius:2px;font-family:'IBM Plex Sans',sans-serif;font-size:15px;color:#3A3B3D;outline:none;transition:border-color .12s ease, background-color .12s ease;" style-focus="border-color:#3A3B3D;border-bottom-color:#8CC63F;background:#FFFFFF;" />
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;">
+            <label for="ing-pass" style="font-size:13.5px;font-weight:500;color:#3A3B3D;">Contraseña</label>
+            <button type="button" onClick="{{ toggle }}" aria-pressed="{{ shown }}" aria-controls="ing-pass" style="background:none;border:0;padding:2px 0;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:500;color:#58595B;cursor:pointer;border-bottom:1px solid transparent;transition:color .12s ease;" style-hover="color:#3A3B3D;border-bottom-color:#8CC63F;" style-focus="outline:2px solid #8CC63F;outline-offset:3px;">{{ toggleLabel }}</button>
+          </div>
+          <input data-field id="ing-pass" name="contrasena" type="{{ passType }}" autoComplete="current-password" placeholder="••••••••" style="width:100%;box-sizing:border-box;height:48px;padding:0 14px;background:#F2F4F1;border:1px solid #DCE0D8;border-bottom:2px solid #DCE0D8;border-radius:2px;font-family:'IBM Plex Sans',sans-serif;font-size:15px;color:#3A3B3D;outline:none;transition:border-color .12s ease, background-color .12s ease;" style-focus="border-color:#3A3B3D;border-bottom-color:#8CC63F;background:#FFFFFF;" />
+        </div>
+
+      </div>
+
+      <div style="margin-top:26px;">
+        <sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}">
+          <button data-submit type="submit" style="width:100%;height:52px;border:0;border-radius:2px;background:#3A3B3D;color:#FFFFFF;font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;letter-spacing:0.012em;cursor:pointer;transition:background-color .12s ease;" style-hover="background:#2B2C2E;" style-active="background:#5A8F2B;" style-focus="outline:2px solid #8CC63F;outline-offset:3px;">Ingresar</button>
+        </sc-if>
+        <sc-if value="{{ loading }}">
+          <button data-submit type="submit" disabled="disabled" aria-busy="true" style="position:relative;overflow:hidden;width:100%;height:52px;border:0;border-radius:2px;background:#58595B;color:#FFFFFF;font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;letter-spacing:0.012em;cursor:default;">Verificando…<span data-bar style="position:absolute;left:0;bottom:0;height:2px;width:34%;background:#8CC63F;animation:ing-bar 1.15s linear infinite;"></span></button>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ forgot }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:18px;display:flex;justify-content:flex-end;">
+          <a href="#recuperar" style="font-size:12.5px;color:#58595B;text-decoration:none;border-bottom:1px solid #DCE0D8;padding-bottom:1px;transition:color .12s ease, border-color .12s ease;" style-hover="color:#3A3B3D;border-bottom-color:#8CC63F;">¿Olvidó su contraseña?</a>
+        </div>
+      </sc-if>
+
+    </form>
+
+    <div data-footer style="position:absolute;left:8%;bottom:30px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:0.01em;color:#58595B;">INGSOLMEP S.A.S. · Riohacha, La Guajira</div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;splitWordmark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Marca&quot;},&quot;signalMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Composición&quot;},&quot;showForgotLink&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tarjeta&quot;}}">
+class Component extends DCLogic {
+  state = { shown: false, loading: false, error: "" };
+
+  submit = (e) => {
+    e.preventDefault();
+    if (this.state.loading) return;
+    this.setState({ loading: true, error: "" });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => {
+      this.setState({
+        loading: false,
+        error: "Usuario o contraseña incorrectos. Le quedan 4 intentos antes del bloqueo temporal de la cuenta."
+      });
+    }, 1700);
+  };
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  renderVals() {
+    const { shown, loading, error } = this.state;
+    const split = this.props.splitWordmark ?? true;
+    return {
+      split, solid: !split,
+      motion: this.props.signalMotion ?? true,
+      forgot: this.props.showForgotLink ?? true,
+      shown,
+      passType: shown ? "text" : "password",
+      toggleLabel: shown ? "Ocultar" : "Mostrar",
+      toggle: () => this.setState((s) => ({ shown: !s.shown })),
+      submit: this.submit,
+      loading, idle: !loading,
+      hasError: !!error && !loading,
+      error
+    };
+  }
+}
+</script>
+</body>
+</html>

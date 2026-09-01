@@ -9,7 +9,8 @@
     x-show="$wire.mostrarFormulario"
     x-transition.opacity.duration.200ms
     {{-- El bloqueo del scroll del cuerpo lo lleva `modal-detalle`, que observa los tres modales a la vez. --}}
-    x-on:keydown.escape.window="$wire.mostrarFormulario && $wire.cerrarFormulario()"
+    x-on:keydown.escape.window="$wire.mostrarFormulario && ! $wire.confirmarCierreFormulario && $wire.intentarCerrarFormulario()"
+    x-on:click.self="$wire.intentarCerrarFormulario()"
     class="fixed inset-0 z-50 overflow-y-auto bg-carbon-deep/70 p-3 backdrop-blur-sm sm:p-6"
     role="dialog"
     aria-modal="true"
@@ -39,7 +40,7 @@
                     </p>
                 </div>
 
-                <button type="button" class="eq-icon-btn !text-zinc-400 hover:!bg-white/10 hover:!text-white" wire:click="cerrarFormulario" title="Cerrar">
+                <button type="button" class="eq-icon-btn !text-zinc-400 hover:!bg-white/10 hover:!text-white" wire:click="intentarCerrarFormulario" title="Cerrar">
                     <flux:icon name="x-mark" variant="mini" class="size-5" />
                 </button>
             </div>
@@ -140,7 +141,7 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button type="button" class="eq-btn eq-btn-ghost" wire:click="cerrarFormulario">Cancelar</button>
+                    <button type="button" class="eq-btn eq-btn-ghost" wire:click="intentarCerrarFormulario">Cancelar</button>
 
                     @if ($paso > 1)
                         <button type="button" class="eq-btn eq-btn-ghost" wire:click="anterior">
@@ -164,5 +165,44 @@
                 </div>
             </div>
         </form>
+    </div>
+
+    {{-- Aviso al cerrar con datos escritos sin guardar --}}
+    <div
+        x-cloak
+        x-show="$wire.confirmarCierreFormulario"
+        x-transition.opacity.duration.150ms
+        x-on:click.self="$wire.continuarEditando()"
+        class="fixed inset-0 z-60 flex items-center justify-center bg-carbon-deep/70 p-4 backdrop-blur-sm"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="eq-aviso-cierre-titulo"
+    >
+        <div
+            x-show="$wire.confirmarCierreFormulario"
+            x-transition:enter="transition duration-200 ease-out"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            class="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-black/5 dark:bg-zinc-900 dark:ring-white/10"
+        >
+            <div class="flex items-start gap-4">
+                <span class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                    <flux:icon name="exclamation-triangle" class="size-5" />
+                </span>
+
+                <div>
+                    <h2 id="eq-aviso-cierre-titulo" class="text-[16px] font-bold text-carbon dark:text-white">¿Cerrar sin guardar?</h2>
+                    <p class="mt-1.5 text-[13px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        Hay información digitada en {{ $equipoId ? 'la edición de este equipo' : 'el registro de este equipo' }} que todavía no se ha guardado.
+                        Si cierra ahora, se perderá.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+                <button type="button" class="eq-btn eq-btn-ghost" wire:click="continuarEditando">Seguir editando</button>
+                <button type="button" class="eq-btn eq-btn-danger" wire:click="cerrarFormulario">Cerrar y descartar</button>
+            </div>
+        </div>
     </div>
 </div>

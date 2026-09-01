@@ -12,6 +12,13 @@
         <span class="eq-hint">Es la columna «Mantenimiento» del listado.</span>
     </div>
 
+    <div>
+        <label class="eq-label" for="eq-ultimo-mantenimiento">Fecha del último mantenimiento</label>
+        <input id="eq-ultimo-mantenimiento" type="date" class="eq-input sm:max-w-64" wire:model="ultimo_mantenimiento">
+        <span class="eq-hint">Fecha de la última intervención ejecutada sobre el equipo.</span>
+        @error('ultimo_mantenimiento') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
+    </div>
+
     <div class="rounded-2xl border border-lima/40 bg-lima-soft/70 p-5 dark:border-lima/25 dark:bg-lima/5">
         <p class="mb-4 flex items-center gap-2 text-[12px] font-bold tracking-wide text-lima-700 uppercase dark:text-lima">
             <flux:icon name="clipboard-document-check" class="size-4" /> Resumen del registro

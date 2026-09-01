@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\Storage;
  * @property string $descripcion
  * @property string|null $numero_serie
  * @property bool $activo
+ * @property Carbon|null $garantia_vence
+ * @property Carbon|null $ultimo_mantenimiento
  * @property array<string, bool>|null $subtareas
  * @property array<string, string>|null $accesorios_estado
  */
@@ -21,7 +24,7 @@ use Illuminate\Support\Facades\Storage;
     'descripcion', 'numero_serie', 'registro_invima', 'clasificacion_riesgo',
     'clasificacion_especialidad', 'fabricante', 'pais_origen', 'telefono_fabricante',
     'tipo_adquisicion', 'prioridad', 'observaciones_tecnicas', 'observaciones_generales',
-    'foto_path', 'mantenimiento', 'activo',
+    'foto_path', 'mantenimiento', 'activo', 'garantia_vence', 'ultimo_mantenimiento',
     'suministro_electrico', 'voltaje', 'amperaje', 'frecuencia', 'corriente', 'potencia',
     'voltios', 'temperatura', 'presion', 'peso', 'velocidad', 'tecnologia_predominante',
     'subtareas', 'accesorios_estado', 'componentes', 'observaciones_ot',
@@ -111,6 +114,8 @@ class Equipo extends Model
     {
         return [
             'activo' => 'boolean',
+            'garantia_vence' => 'date',
+            'ultimo_mantenimiento' => 'date',
             'subtareas' => 'array',
             'accesorios_estado' => 'array',
         ];

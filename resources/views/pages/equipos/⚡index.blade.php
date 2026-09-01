@@ -66,6 +66,12 @@ new #[Title('Equipos')] class extends Component {
 
     public bool $mostrarFormulario = false;
 
+    /** Hay datos escritos en el asistente que todavía no se han guardado. */
+    public bool $formularioSucio = false;
+
+    /** Muestra el aviso previo a cerrar el asistente con cambios pendientes. */
+    public bool $confirmarCierreFormulario = false;
+
     public int $paso = 1;
 
     public int $pasoMaximo = 1;
@@ -106,6 +112,8 @@ new #[Title('Equipos')] class extends Component {
 
     public string $tipo_adquisicion = '';
 
+    public string $garantia_vence = '';
+
     public string $prioridad = '';
 
     public string $observaciones_tecnicas = '';
@@ -113,6 +121,8 @@ new #[Title('Equipos')] class extends Component {
     public string $observaciones_generales = '';
 
     public string $mantenimiento = '';
+
+    public string $ultimo_mantenimiento = '';
 
     public bool $activo = true;
 
@@ -395,6 +405,14 @@ new #[Title('Equipos')] class extends Component {
 
         if (str_starts_with($propiedad, 'filtro') || in_array($propiedad, ['buscar', 'porPagina'], true)) {
             $this->resetPage();
+
+            return;
+        }
+
+        // Cualquier campo tocado con el asistente abierto cuenta como cambio
+        // pendiente, para avisar antes de cerrarlo y perder lo escrito.
+        if ($this->mostrarFormulario) {
+            $this->formularioSucio = true;
         }
     }
 
@@ -492,6 +510,9 @@ new #[Title('Equipos')] class extends Component {
         foreach ($this->camposDirectos() as $campo) {
             $this->{$campo} = (string) ($equipo->{$campo} ?? '');
         }
+
+        $this->garantia_vence = $equipo->garantia_vence?->format('Y-m-d') ?? '';
+        $this->ultimo_mantenimiento = $equipo->ultimo_mantenimiento?->format('Y-m-d') ?? '';
 
         $this->activo = (bool) $equipo->activo;
         $this->suministro_electrico = $equipo->suministro_electrico ?: 'ac';
@@ -641,9 +662,30 @@ new #[Title('Equipos')] class extends Component {
         );
     }
 
+    /**
+     * Cierre pedido por el usuario: si hay datos escritos sin guardar, primero
+     * se pregunta; si no, se cierra directamente.
+     */
+    public function intentarCerrarFormulario(): void
+    {
+        if ($this->formularioSucio) {
+            $this->confirmarCierreFormulario = true;
+
+            return;
+        }
+
+        $this->cerrarFormulario();
+    }
+
+    public function continuarEditando(): void
+    {
+        $this->confirmarCierreFormulario = false;
+    }
+
     public function cerrarFormulario(): void
     {
         $this->mostrarFormulario = false;
+        $this->confirmarCierreFormulario = false;
         $this->resetValidation();
         $this->reiniciarFormulario();
     }
@@ -664,6 +706,9 @@ new #[Title('Equipos')] class extends Component {
 
     public function confirmarEliminacion(int $id): void
     {
+        // Eliminar desde la vista de detalle la reemplaza por la confirmación.
+        $this->equipoVisto = null;
+
         $this->equipoAEliminar = $id;
     }
 
@@ -713,8 +758,9 @@ new #[Title('Equipos')] class extends Component {
         return [
             'descripcion', 'numero_serie', 'registro_invima', 'clasificacion_riesgo',
             'clasificacion_especialidad', 'fabricante', 'pais_origen', 'telefono_fabricante',
-            'tipo_adquisicion', 'prioridad', 'observaciones_tecnicas', 'observaciones_generales',
-            'mantenimiento', 'voltaje', 'amperaje', 'frecuencia', 'corriente', 'potencia',
+            'tipo_adquisicion', 'garantia_vence', 'prioridad', 'observaciones_tecnicas',
+            'observaciones_generales', 'mantenimiento', 'ultimo_mantenimiento',
+            'voltaje', 'amperaje', 'frecuencia', 'corriente', 'potencia',
             'voltios', 'temperatura', 'presion', 'peso', 'velocidad', 'tecnologia_predominante',
             'componentes', 'observaciones_ot',
         ];
@@ -726,9 +772,9 @@ new #[Title('Equipos')] class extends Component {
             'equipoId', 'empresa_id', 'areaNombre', 'marcaNombre', 'modeloNombre',
             'descripcion', 'numero_serie', 'registro_invima', 'clasificacion_riesgo',
             'clasificacion_especialidad', 'fabricante', 'pais_origen', 'telefono_fabricante',
-            'tipo_adquisicion', 'prioridad', 'observaciones_tecnicas', 'observaciones_generales',
-            'areaNueva', 'marcaNueva', 'modeloNuevo',
-            'mantenimiento', 'activo', 'foto', 'fotoActual', 'suministro_electrico',
+            'tipo_adquisicion', 'garantia_vence', 'prioridad', 'observaciones_tecnicas',
+            'observaciones_generales', 'areaNueva', 'marcaNueva', 'modeloNuevo',
+            'mantenimiento', 'ultimo_mantenimiento', 'activo', 'foto', 'fotoActual', 'suministro_electrico',
             'voltaje', 'amperaje', 'frecuencia', 'corriente', 'potencia', 'voltios',
             'temperatura', 'presion', 'peso', 'velocidad', 'tecnologia_predominante',
             'componentes', 'observaciones_ot', 'paso', 'pasoMaximo',
@@ -736,6 +782,9 @@ new #[Title('Equipos')] class extends Component {
 
         $this->subtareas = array_fill_keys(array_keys(Equipo::SUBTAREAS), false);
         $this->accesorios_estado = array_fill_keys(array_keys(Equipo::ACCESORIOS), '');
+
+        $this->formularioSucio = false;
+        $this->confirmarCierreFormulario = false;
     }
 
     /** @return array<string, mixed> */
@@ -753,6 +802,7 @@ new #[Title('Equipos')] class extends Component {
                 'pais_origen' => ['nullable', 'string', 'max:255'],
                 'telefono_fabricante' => ['nullable', 'string', 'max:60'],
                 'tipo_adquisicion' => [Rule::in(array_merge([''], Equipo::TIPOS_ADQUISICION))],
+                'garantia_vence' => ['nullable', 'date'],
                 'prioridad' => [Rule::in(array_merge([''], Equipo::PRIORIDADES))],
                 'numero_serie' => ['nullable', 'string', 'max:255'],
                 'empresa_id' => $this->empresa_id === '' ? ['nullable'] : ['exists:empresas,id'],
@@ -787,6 +837,7 @@ new #[Title('Equipos')] class extends Component {
             5 => [
                 'observaciones_ot' => ['nullable', 'string', 'max:2000'],
                 'mantenimiento' => ['nullable', 'string', 'max:2000'],
+                'ultimo_mantenimiento' => ['nullable', 'date'],
                 'activo' => ['boolean'],
             ],
             default => [],
@@ -808,6 +859,8 @@ new #[Title('Equipos')] class extends Component {
             'numero_serie' => 'número de serie',
             'empresa_id' => 'empresa',
             'areaNombre' => 'área',
+            'garantia_vence' => 'fecha de vencimiento de la garantía',
+            'ultimo_mantenimiento' => 'fecha del último mantenimiento',
             'observaciones_tecnicas' => 'observaciones técnicas',
             'observaciones_generales' => 'observaciones generales',
             'suministro_electrico' => 'suministro eléctrico',
@@ -840,10 +893,10 @@ new #[Title('Equipos')] class extends Component {
     {{-- ───────────────── Indicadores ───────────────── --}}
     @php
         $tarjetas = [
-            ['tipo' => 'total', 'etiqueta' => 'Equipos registrados', 'valor' => $this->resumen['total'], 'icono' => 'cpu-chip', 'color' => 'from-signal to-signal-600', 'sombra' => 'shadow-signal/25'],
-            ['tipo' => 'activos', 'etiqueta' => 'En servicio', 'valor' => $this->resumen['activos'], 'icono' => 'check-badge', 'color' => 'from-lima to-lima-700', 'sombra' => 'shadow-lima/25'],
-            ['tipo' => 'fueraDeServicio', 'etiqueta' => 'Fuera de servicio', 'valor' => $this->resumen['fueraDeServicio'], 'icono' => 'bolt-slash', 'color' => 'from-rose-500 to-rose-600', 'sombra' => 'shadow-rose-500/25'],
-            ['tipo' => 'sinAsignar', 'etiqueta' => 'Sin asignar', 'valor' => $this->resumen['sinAsignar'], 'icono' => 'rectangle-stack', 'color' => 'from-amber-400 to-amber-600', 'sombra' => 'shadow-amber-500/25'],
+            ['tipo' => 'total', 'etiqueta' => 'Equipos registrados', 'valor' => $this->resumen['total'], 'color' => 'text-signal'],
+            ['tipo' => 'activos', 'etiqueta' => 'En servicio', 'valor' => $this->resumen['activos'], 'color' => 'text-lima-700 dark:text-lima'],
+            ['tipo' => 'fueraDeServicio', 'etiqueta' => 'Fuera de servicio', 'valor' => $this->resumen['fueraDeServicio'], 'color' => 'text-rose-600 dark:text-rose-400'],
+            ['tipo' => 'sinAsignar', 'etiqueta' => 'Sin asignar', 'valor' => $this->resumen['sinAsignar'], 'color' => 'text-amber-600 dark:text-amber-500'],
         ];
     @endphp
 
@@ -853,18 +906,10 @@ new #[Title('Equipos')] class extends Component {
                 type="button"
                 wire:click="verListado('{{ $tarjeta['tipo'] }}')"
                 title="Ver el listado de {{ mb_strtolower($tarjeta['etiqueta']) }}"
-                class="eq-panel group flex w-full cursor-pointer items-center gap-4 p-4 text-left transition duration-300 outline-none hover:-translate-y-1 hover:shadow-lg focus-visible:ring-4 focus-visible:ring-lima/30"
+                class="eq-panel flex w-full cursor-pointer flex-col items-center justify-center gap-1 px-4 py-5 text-center transition duration-300 outline-none hover:-translate-y-1 hover:shadow-lg focus-visible:ring-4 focus-visible:ring-lima/30"
             >
-                <span class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br {{ $tarjeta['color'] }} text-white shadow-lg {{ $tarjeta['sombra'] }}">
-                    <flux:icon name="{{ $tarjeta['icono'] }}" class="size-6" />
-                </span>
-
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11.5px] font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{{ $tarjeta['etiqueta'] }}</p>
-                    <p class="text-2xl font-bold text-carbon dark:text-white">{{ $tarjeta['valor'] }}</p>
-                </div>
-
-                <flux:icon name="chevron-right" variant="mini" class="size-4 shrink-0 text-zinc-300 transition duration-300 group-hover:translate-x-0.5 group-hover:text-lima dark:text-zinc-600" />
+                <p class="text-3xl leading-none font-bold {{ $tarjeta['color'] }}">{{ $tarjeta['valor'] }}</p>
+                <p class="text-[11.5px] font-semibold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">{{ $tarjeta['etiqueta'] }}</p>
             </button>
         @endforeach
     </div>
@@ -981,11 +1026,10 @@ new #[Title('Equipos')] class extends Component {
                     <tr>
                         @php
                             $columnas = [
-                                ['clave' => 'id', 'titulo' => '#', 'ordenable' => true],
+                                ['clave' => 'numero_serie', 'titulo' => 'N.º de serie', 'ordenable' => true],
                                 ['clave' => 'descripcion', 'titulo' => 'Equipo', 'ordenable' => true],
                                 ['clave' => null, 'titulo' => 'Empresa / Área', 'ordenable' => false],
                                 ['clave' => null, 'titulo' => 'Marca / Modelo', 'ordenable' => false],
-                                ['clave' => 'numero_serie', 'titulo' => 'N.º de serie', 'ordenable' => true],
                                 ['clave' => null, 'titulo' => 'Observaciones técnicas', 'ordenable' => false],
                                 ['clave' => null, 'titulo' => 'Mantenimiento', 'ordenable' => false],
                                 ['clave' => 'activo', 'titulo' => 'Estado', 'ordenable' => true],
@@ -1008,8 +1052,6 @@ new #[Title('Equipos')] class extends Component {
                                 @endif
                             </th>
                         @endforeach
-
-                        <th scope="col" class="px-4 py-3 text-right font-bold whitespace-nowrap">Acciones</th>
                     </tr>
                 </thead>
 
@@ -1017,13 +1059,13 @@ new #[Title('Equipos')] class extends Component {
                     @forelse ($this->equipos as $equipo)
                         <tr
                             wire:key="equipo-{{ $equipo->id }}"
-                            wire:click="verEquipo({{ $equipo->id }})"
                             tabindex="0"
+                            wire:click="verEquipo({{ $equipo->id }})"
                             wire:keydown.enter="verEquipo({{ $equipo->id }})"
                             title="Ver la ficha de {{ $equipo->descripcion }}"
                             class="cursor-pointer transition duration-150 outline-none hover:bg-lima-soft/40 focus-visible:bg-lima-soft/60 dark:hover:bg-zinc-800/50 dark:focus-visible:bg-zinc-800/70"
                         >
-                            <td class="px-4 py-3 align-top font-mono text-[12px] text-zinc-400">{{ $equipo->id }}</td>
+                            <td class="px-4 py-3 align-top font-mono text-[12px] text-zinc-600 dark:text-zinc-300">{{ $equipo->numero_serie ?: '—' }}</td>
 
                             <td class="px-4 py-3 align-top">
                                 <div class="flex items-center gap-3">
@@ -1054,8 +1096,6 @@ new #[Title('Equipos')] class extends Component {
                                 <p class="text-[12px] text-zinc-500 dark:text-zinc-400">{{ $equipo->modelo?->nombre ?? '—' }}</p>
                             </td>
 
-                            <td class="px-4 py-3 align-top font-mono text-[12px] text-zinc-600 dark:text-zinc-300">{{ $equipo->numero_serie ?: '—' }}</td>
-
                             <td class="max-w-56 px-4 py-3 align-top text-zinc-600 dark:text-zinc-300">
                                 <span class="line-clamp-2" title="{{ $equipo->observaciones_tecnicas }}">{{ $equipo->observaciones_tecnicas ?: '—' }}</span>
                             </td>
@@ -1084,19 +1124,10 @@ new #[Title('Equipos')] class extends Component {
                                 </button>
                             </td>
 
-                            <td class="px-4 py-3 text-right align-top whitespace-nowrap">
-                                <button type="button" class="eq-icon-btn" title="Editar" wire:click.stop="editar({{ $equipo->id }})">
-                                    <flux:icon name="pencil-square" variant="mini" class="size-4" />
-                                </button>
-
-                                <button type="button" class="eq-icon-btn hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!bg-rose-500/10" title="Eliminar" wire:click.stop="confirmarEliminacion({{ $equipo->id }})">
-                                    <flux:icon name="trash" variant="mini" class="size-4" />
-                                </button>
-                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-4 py-16 text-center">
+                            <td colspan="7" class="px-4 py-16 text-center">
                                 <div class="mx-auto flex max-w-sm flex-col items-center gap-3">
                                     <span class="flex size-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
                                         <flux:icon name="cpu-chip" class="size-7 text-zinc-400" />
@@ -1129,22 +1160,33 @@ new #[Title('Equipos')] class extends Component {
         @endif
     </div>
 
-    @include('pages.equipos.partials.modal-formulario', [
-        'pasosDefinicion' => $this::PASOS,
-        'marcasSugeridas' => $this->marcas,
-        'modelosSugeridos' => $this->modelosDeMarca,
-        'empresasDisponibles' => $this->empresas,
-        'areasSugeridas' => $this->areasDeEmpresa,
-        'nombreEmpresa' => $this->nombreEmpresaSeleccionada,
-    ])
-    @include('pages.equipos.partials.modal-detalle', ['equipo' => $this->equipoDetalle])
+    {{-- Los modales se teletransportan al <body>: dentro del contenedor de la
+         página el velo `fixed` no llegaba a cubrir toda la pantalla. --}}
+    @teleport('body')
+        @include('pages.equipos.partials.modal-formulario', [
+            'pasosDefinicion' => $this::PASOS,
+            'marcasSugeridas' => $this->marcas,
+            'modelosSugeridos' => $this->modelosDeMarca,
+            'empresasDisponibles' => $this->empresas,
+            'areasSugeridas' => $this->areasDeEmpresa,
+            'nombreEmpresa' => $this->nombreEmpresaSeleccionada,
+        ])
+    @endteleport
 
-    @include('pages.equipos.partials.modal-listado', [
-        'listados' => $this::LISTADOS,
-        'equiposListados' => $this->listadoEquipos,
-        'totalListado' => $this->listadoTotal,
-        'topeListado' => $this::TOPE_LISTADO,
-    ])
+    @teleport('body')
+        @include('pages.equipos.partials.modal-detalle', ['equipo' => $this->equipoDetalle])
+    @endteleport
 
-    @include('pages.equipos.partials.modal-eliminar')
+    @teleport('body')
+        @include('pages.equipos.partials.modal-listado', [
+            'listados' => $this::LISTADOS,
+            'equiposListados' => $this->listadoEquipos,
+            'totalListado' => $this->listadoTotal,
+            'topeListado' => $this::TOPE_LISTADO,
+        ])
+    @endteleport
+
+    @teleport('body')
+        @include('pages.equipos.partials.modal-eliminar')
+    @endteleport
 </section>

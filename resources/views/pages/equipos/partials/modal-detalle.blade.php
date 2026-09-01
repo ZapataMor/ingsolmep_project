@@ -5,6 +5,7 @@
     x-transition.opacity.duration.200ms
     x-effect="document.body.style.overflow = ($wire.equipoVisto !== null || $wire.mostrarFormulario || $wire.listadoVisto !== '') ? 'hidden' : ''"
     x-on:keydown.escape.window="$wire.equipoVisto !== null && $wire.cerrarDetalle()"
+    x-on:click.self="$wire.cerrarDetalle()"
     class="fixed inset-0 z-50 overflow-y-auto bg-carbon-deep/70 p-3 backdrop-blur-sm sm:p-6"
     role="dialog"
     aria-modal="true"
@@ -53,6 +54,8 @@
                     'País de origen' => $equipo->pais_origen,
                     'Teléfono del fabricante' => $equipo->telefono_fabricante,
                     'Tipo de adquisición' => $equipo->tipo_adquisicion,
+                    'Garantía' => $equipo->garantia_vence?->format('d/m/Y'),
+                    'Último mantenimiento' => $equipo->ultimo_mantenimiento?->format('d/m/Y'),
                     'Prioridad' => $equipo->prioridad,
                     'Fecha de registro' => $equipo->created_at?->format('d/m/Y'),
                 ];
@@ -199,8 +202,18 @@
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 bg-zinc-50/80 px-6 py-4 sm:px-8 dark:border-zinc-800 dark:bg-zinc-800/40">
                 <p class="text-[12px] text-zinc-500 dark:text-zinc-400">Vista de sólo lectura.</p>
 
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                     <button type="button" class="eq-btn eq-btn-ghost" wire:click="cerrarDetalle">Cerrar</button>
+
+                    <button
+                        type="button"
+                        class="eq-btn eq-btn-ghost hover:!border-rose-200 hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!border-rose-500/30 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
+                        wire:click="confirmarEliminacion({{ $equipo->id }})"
+                    >
+                        <flux:icon name="trash" variant="mini" class="size-4" />
+                        Eliminar
+                    </button>
+
                     <button type="button" class="eq-btn eq-btn-primary" wire:click="editar({{ $equipo->id }})">
                         <flux:icon name="pencil-square" variant="mini" class="size-4" />
                         Editar equipo

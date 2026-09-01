@@ -4,6 +4,7 @@
     x-show="$wire.equipoAEliminar !== null"
     x-transition.opacity.duration.200ms
     x-on:keydown.escape.window="$wire.equipoAEliminar !== null && $wire.set('equipoAEliminar', null)"
+    x-on:click.self="$wire.set('equipoAEliminar', null)"
     class="fixed inset-0 z-50 flex items-center justify-center bg-carbon-deep/70 p-4 backdrop-blur-sm"
     role="dialog"
     aria-modal="true"

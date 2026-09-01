@@ -104,6 +104,13 @@
     </div>
 
     <div>
+        <label class="eq-label" for="eq-garantia">Vencimiento de la garantía</label>
+        <input id="eq-garantia" type="date" class="eq-input" wire:model="garantia_vence">
+        <span class="eq-hint">Fecha en que termina la garantía del fabricante.</span>
+        @error('garantia_vence') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
+    </div>
+
+    <div>
         <label class="eq-label" for="eq-prioridad">Prioridad</label>
         <select id="eq-prioridad" class="eq-select" wire:model="prioridad">
             <option value="">Seleccione</option>

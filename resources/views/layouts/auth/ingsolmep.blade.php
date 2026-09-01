@@ -39,11 +39,27 @@
                 inset: 0;
                 clip-path: polygon(42% 0%, 100% 0%, 100% 100%, 24% 100%);
                 background-color: #23262A;
+            }
+
+            /* La retícula se desborda 80 px por lado para que la deriva no
+               descubra ningún borde. El paso mayor de 80 px es múltiplo del
+               menor de 16 px, así que al recorrer 80 px el ciclo cierra
+               exactamente y el bucle es imperceptible. */
+            .ing-grid {
+                position: absolute;
+                inset: -80px;
                 background-image:
                     repeating-linear-gradient(to right, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 16px),
                     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 16px),
                     repeating-linear-gradient(to right, rgba(255, 255, 255, 0.075) 0 1px, transparent 1px 80px),
                     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.075) 0 1px, transparent 1px 80px);
+                animation: ing-grid-drift 34s linear infinite;
+                will-change: transform;
+            }
+
+            @keyframes ing-grid-drift {
+                from { transform: translate3d(0, 0, 0); }
+                to   { transform: translate3d(-80px, 80px, 0); }
             }
 
             .ing-plane-a {
@@ -104,6 +120,8 @@
                 box-sizing: border-box;
                 background: #FFFFFF;
                 border: 1px solid #DCE0D8;
+                border-top-color: #8CC63F;
+                border-left-color: #8CC63F;
                 border-radius: 16px;
                 box-shadow:
                     0 1px 2px rgba(35, 38, 42, 0.05),
@@ -124,6 +142,7 @@
 
             .ing-wordmark {
                 margin: 0;
+                text-align: center;
                 font-size: 34px;
                 font-weight: 600;
                 letter-spacing: -0.02em;
@@ -135,8 +154,18 @@
                 color: #8CC63F;
             }
 
+            /* El sufijo societario acompaña al wordmark sin competir con él. */
+            .ing-wordmark-suffix {
+                margin-left: 9px;
+                font-size: 17px;
+                font-weight: 500;
+                letter-spacing: 0;
+                color: #58595B;
+            }
+
             .ing-subtitle {
                 margin: 10px 0 0;
+                text-align: center;
                 font-size: 14px;
                 line-height: 1.45;
                 color: #58595B;
@@ -188,9 +217,10 @@
 
             .ing-label-row {
                 display: flex;
-                align-items: baseline;
+                align-items: center;
                 justify-content: space-between;
                 gap: 16px;
+                min-height: 20px;
             }
 
             .ing-label {
@@ -223,29 +253,36 @@
 
             .ing-field:focus,
             .ing-field:focus-visible {
-                border-color: #3A3B3D;
-                border-bottom-color: #8CC63F;
+                border-color: #8CC63F;
                 background: #FFFFFF;
                 box-shadow: inset 0 1px 2px rgba(35, 38, 42, 0.03);
             }
 
             /* --- Botón Mostrar / Ocultar --- */
             .ing-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                margin: -4px -4px -4px 0;
                 background: none;
                 border: 0;
-                padding: 2px 0;
-                font-family: 'IBM Plex Sans', sans-serif;
-                font-size: 12.5px;
-                font-weight: 500;
+                border-radius: 8px;
+                padding: 0;
                 color: #58595B;
                 cursor: pointer;
-                border-bottom: 1px solid transparent;
-                transition: color .12s ease, border-color .12s ease;
+                transition: color .12s ease, background-color .12s ease;
+            }
+
+            .ing-toggle-icon {
+                width: 18px;
+                height: 18px;
             }
 
             .ing-toggle:hover {
                 color: #3A3B3D;
-                border-bottom-color: #8CC63F;
+                background: #F2F4F1;
             }
 
             .ing-toggle:focus-visible {
@@ -277,21 +314,25 @@
                     inset 0 -1px 0 rgba(0, 0, 0, 0.35),
                     0 4px 10px -2px rgba(35, 38, 42, 0.42),
                     0 8px 20px -8px rgba(35, 38, 42, 0.5);
-                transition: background-color .12s ease, box-shadow .12s ease, transform .12s ease;
+                transition: background-color .12s ease, color .12s ease, box-shadow .12s ease, transform .12s ease;
             }
 
             .ing-submit:hover {
-                background: linear-gradient(180deg, #3B3D3F 0%, #2F3032 55%, #262728 100%);
+                background: linear-gradient(180deg, #9BD24B 0%, #8CC63F 55%, #7CB432 100%);
+                /* Texto en carbón: el blanco sobre lima queda en 1.9:1 y es
+                   ilegible; el carbón sobre lima da 8.2:1. */
+                color: #23262A;
                 box-shadow:
-                    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-                    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-                    0 6px 14px -2px rgba(35, 38, 42, 0.46),
-                    0 12px 26px -10px rgba(35, 38, 42, 0.55);
+                    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+                    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+                    0 6px 14px -2px rgba(90, 143, 43, 0.4),
+                    0 12px 26px -10px rgba(90, 143, 43, 0.5);
                 transform: translateY(-1px);
             }
 
             .ing-submit:active {
                 background: linear-gradient(180deg, #5A8F2B 0%, #55872A 100%);
+                color: #FFFFFF;
                 box-shadow:
                     inset 0 2px 4px rgba(0, 0, 0, 0.35),
                     0 1px 2px rgba(35, 38, 42, 0.3);
@@ -373,7 +414,8 @@
                     opacity: 0 !important;
                 }
 
-                .ing-signal {
+                .ing-signal,
+                .ing-grid {
                     animation: none !important;
                     transform: none !important;
                 }
@@ -409,10 +451,22 @@
 
                 .ing-msignal {
                     display: block;
+                    margin: 0 auto 18px;
                 }
 
                 .ing-field {
                     height: 52px;
+                }
+
+                .ing-toggle {
+                    width: 44px;
+                    height: 44px;
+                    margin: -12px -12px -12px 0;
+                }
+
+                .ing-toggle-icon {
+                    width: 20px;
+                    height: 20px;
                 }
 
                 .ing-submit {
@@ -428,6 +482,7 @@
     <body class="ing-body">
         <div class="ing-root">
             <div class="ing-graphic" aria-hidden="true">
+                <div class="ing-grid"></div>
                 <div class="ing-plane-a"></div>
                 <div class="ing-plane-b"></div>
 

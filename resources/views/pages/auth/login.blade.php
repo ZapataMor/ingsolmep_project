@@ -20,7 +20,7 @@
             />
         </svg>
 
-        <h1 class="ing-wordmark"><span class="ing-wordmark-mark">INGS</span><span>OLMEP</span></h1>
+        <h1 class="ing-wordmark"><span class="ing-wordmark-mark">INGS</span><span>OLMEP</span><span class="ing-wordmark-suffix">S.A.S.</span></h1>
         <p class="ing-subtitle">Sistema de Gestión de Equipos Médicos</p>
 
         <div class="ing-rule"></div>
@@ -57,11 +57,25 @@
                         class="ing-toggle"
                         type="button"
                         aria-controls="ing-pass"
-                        :aria-pressed="shown ? 'true' : 'false'"
                         aria-pressed="false"
+                        aria-label="Mostrar contraseña"
+                        :aria-pressed="shown ? 'true' : 'false'"
+                        :aria-label="shown ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                        :title="shown ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+                        title="Mostrar contraseña"
                         @click="shown = ! shown"
-                        x-text="shown ? 'Ocultar' : 'Mostrar'"
-                    >Mostrar</button>
+                    >
+                        <svg class="ing-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" x-show="! shown">
+                            <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.94 10.94 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.94 10.94 0 0 1-19.88 0" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        <svg class="ing-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" x-show="shown" x-cloak>
+                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                            <path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                            <line x1="2" y1="2" x2="22" y2="22" />
+                        </svg>
+                    </button>
                 </div>
                 <input
                     class="ing-field"

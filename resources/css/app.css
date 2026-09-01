@@ -64,3 +64,120 @@ select:focus[data-flux-control] {
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
+
+/* ===============================================================
+   Módulo de Equipos — tokens de marca INGSOLMEP
+   lima #8CC63F · verde oscuro #5A8F2B · carbón #3A3B3D
+   azul señal #29ABE2 · neutro #F2F4F1 · carbón profundo #23262A
+   Las clases van prefijadas con `eq-` para no chocar con las
+   clases `ing-` del layout de acceso, que comparte esta hoja.
+   =============================================================== */
+
+@theme {
+    --font-ing: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+
+    --color-lima: #8cc63f;
+    --color-lima-soft: #f0f8e4;
+    --color-lima-600: #74b02c;
+    --color-lima-700: #5a8f2b;
+    --color-carbon: #3a3b3d;
+    --color-carbon-deep: #23262a;
+    --color-signal: #29abe2;
+    --color-signal-600: #1b8cbd;
+    --color-neutro: #f2f4f1;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+.eq-root {
+    font-family: var(--font-ing);
+}
+
+/* --- Campos --- */
+.eq-label {
+    @apply mb-1.5 block text-[12.5px] font-semibold tracking-wide text-carbon dark:text-zinc-300;
+}
+
+.eq-hint {
+    @apply mt-1 block text-[11.5px] text-zinc-500 dark:text-zinc-400;
+}
+
+.eq-req {
+    @apply text-rose-500;
+}
+
+.eq-input,
+.eq-select,
+.eq-textarea {
+    @apply w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-carbon
+           shadow-xs transition duration-150 outline-none
+           placeholder:text-zinc-400
+           hover:border-zinc-300
+           focus:border-lima focus:ring-4 focus:ring-lima/20
+           dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500
+           dark:hover:border-zinc-600 dark:focus:border-lima;
+}
+
+.eq-select {
+    @apply cursor-pointer appearance-none bg-[length:1rem] bg-[right_0.75rem_center] bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+.eq-textarea {
+    @apply min-h-24 resize-y leading-relaxed;
+}
+
+/* --- Botones --- */
+.eq-btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5
+           text-sm font-semibold transition duration-200 outline-none
+           focus-visible:ring-4 focus-visible:ring-lima/30
+           disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100;
+}
+
+.eq-btn-primary {
+    @apply bg-carbon text-white shadow-lg shadow-carbon/20
+           hover:scale-[1.03] hover:bg-carbon-deep hover:shadow-xl hover:shadow-carbon/30
+           active:scale-95 active:bg-lima-700
+           dark:bg-lima dark:text-carbon-deep dark:shadow-lima/20 dark:hover:bg-lima-600;
+}
+
+.eq-btn-accent {
+    @apply bg-gradient-to-br from-lima to-lima-700 text-white shadow-lg shadow-lima/30
+           hover:scale-[1.03] hover:shadow-xl hover:shadow-lima/40 active:scale-95;
+}
+
+.eq-btn-ghost {
+    @apply border border-zinc-200 bg-white text-carbon shadow-xs
+           hover:scale-[1.03] hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-md active:scale-95
+           dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800;
+}
+
+.eq-btn-danger {
+    @apply bg-rose-600 text-white shadow-lg shadow-rose-600/25
+           hover:scale-[1.03] hover:bg-rose-700 hover:shadow-xl active:scale-95;
+}
+
+.eq-icon-btn {
+    @apply inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-transparent
+           text-zinc-500 transition duration-200 outline-none
+           hover:scale-110 hover:bg-zinc-100 hover:text-carbon hover:shadow-md
+           focus-visible:ring-4 focus-visible:ring-lima/30 active:scale-95
+           dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white;
+}
+
+/* --- Superficies --- */
+.eq-panel {
+    @apply rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+}
+
+.eq-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap;
+}
+
+/* --- Wizard --- */
+.eq-step-dot {
+    @apply flex size-9 shrink-0 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-all duration-300;
+}

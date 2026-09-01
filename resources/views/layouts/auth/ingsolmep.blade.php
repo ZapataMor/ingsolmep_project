@@ -53,7 +53,7 @@
                     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 16px),
                     repeating-linear-gradient(to right, rgba(255, 255, 255, 0.075) 0 1px, transparent 1px 80px),
                     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.075) 0 1px, transparent 1px 80px);
-                animation: ing-grid-drift 34s linear infinite;
+                animation: ing-grid-drift 14s linear infinite;
                 will-change: transform;
             }
 
@@ -81,15 +81,15 @@
                 inset: 0;
                 width: 100%;
                 height: 100%;
-                animation: ing-float 9s ease-in-out infinite;
+                animation: ing-float 6s ease-in-out infinite;
                 will-change: transform;
             }
 
-            /* Flote vertical leve del trazo: recorrido total de 14 px. */
+            /* Flote vertical del trazo: recorrido total de 64 px. */
             @keyframes ing-float {
-                0%   { transform: translateY(-7px); }
-                50%  { transform: translateY(7px); }
-                100% { transform: translateY(-7px); }
+                0%   { transform: translateY(-32px); }
+                50%  { transform: translateY(32px); }
+                100% { transform: translateY(-32px); }
             }
 
             .ing-sweep {

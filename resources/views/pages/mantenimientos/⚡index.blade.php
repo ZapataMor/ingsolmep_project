@@ -799,17 +799,10 @@ new #[Title('Mantenimientos')] class extends Component {
             </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-            <button type="button" class="eq-btn eq-btn-ghost" wire:click="abrirCreacion('correctivo')">
-                <flux:icon name="exclamation-triangle" variant="mini" class="size-4 text-amber-500" />
-                Asignar correctivo
-            </button>
-
-            <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion('preventivo')">
-                <flux:icon name="plus" variant="mini" class="size-4" />
-                Asignar preventivo
-            </button>
-        </div>
+        <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
+            <flux:icon name="plus" variant="mini" class="size-4" />
+            Asignar mantenimiento
+        </button>
     </div>
 
     {{-- ───────────────── Indicadores ───────────────── --}}
@@ -1132,7 +1125,7 @@ new #[Title('Mantenimientos')] class extends Component {
                                     @if ($this->hayFiltrosActivos)
                                         <button type="button" class="eq-btn eq-btn-ghost" wire:click="limpiarFiltros">Limpiar filtros</button>
                                     @else
-                                        <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion('preventivo')">
+                                        <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
                                             <flux:icon name="plus" variant="mini" class="size-4" /> Asignar mantenimiento
                                         </button>
                                     @endif

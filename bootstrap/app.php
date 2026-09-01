@@ -12,7 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // El navegador escribe «appearance» desde JavaScript (partials/head),
+        // así que llega sin cifrar y el servidor debe poder leerla tal cual.
+        $middleware->encryptCookies(except: [
+            'appearance',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

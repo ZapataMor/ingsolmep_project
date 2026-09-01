@@ -22,6 +22,10 @@
                 <flux:sidebar.item class="eq-navitem" icon="building-office-2" :href="route('empresas.index')" :current="request()->routeIs('empresas.*')" wire:navigate>
                     {{ __('Empresas') }}
                 </flux:sidebar.item>
+
+                <flux:sidebar.item class="eq-navitem" icon="wrench-screwdriver" :href="route('mantenimientos.index')" :current="request()->routeIs('mantenimientos.*')" wire:navigate>
+                    {{ __('Mantenimientos') }}
+                </flux:sidebar.item>
             </flux:sidebar.nav>
 
             <flux:spacer />

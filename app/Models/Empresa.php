@@ -48,6 +48,12 @@ class Empresa extends Model
         return $this->hasMany(Equipo::class);
     }
 
+    /** @return HasMany<Mantenimiento, $this> */
+    public function mantenimientos(): HasMany
+    {
+        return $this->hasMany(Mantenimiento::class);
+    }
+
     /**
      * URL pública del logo, o null si la empresa no tiene uno cargado.
      */

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Session;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -32,6 +33,28 @@ new #[Title('Equipos')] class extends Component {
         3 => ['titulo' => 'Subtareas', 'icono' => 'wrench-screwdriver'],
         4 => ['titulo' => 'Accesorios', 'icono' => 'squares-2x2'],
         5 => ['titulo' => 'Observaciones', 'icono' => 'document-check'],
+    ];
+
+    /**
+     * Formas de ver el listado: tarjetas para explorar, tabla para comparar.
+     *
+     * @var array<string, array{titulo: string, icono: string}>
+     */
+    public const VISTAS = [
+        'cards' => ['titulo' => 'Tarjetas', 'icono' => 'squares-2x2'],
+        'tabla' => ['titulo' => 'Tabla', 'icono' => 'table-cells'],
+    ];
+
+    /**
+     * Columnas por las que se puede ordenar el listado.
+     *
+     * @var array<string, string>
+     */
+    public const ORDENABLES = [
+        'created_at' => 'Más recientes',
+        'descripcion' => 'Equipo',
+        'numero_serie' => 'N.º de serie',
+        'activo' => 'Estado',
     ];
 
     // ------------------------------------------------------------------
@@ -55,6 +78,10 @@ new #[Title('Equipos')] class extends Component {
     public string $filtroActivo = '';
 
     public int $porPagina = 10;
+
+    /** Vista del listado; se recuerda entre visitas para no reelegirla cada vez. */
+    #[Session(key: 'equipos.vista')]
+    public string $vista = 'cards';
 
     public string $ordenarPor = 'created_at';
 
@@ -218,8 +245,7 @@ new #[Title('Equipos')] class extends Component {
     #[Computed]
     public function equipos(): LengthAwarePaginator
     {
-        $ordenables = ['id', 'descripcion', 'numero_serie', 'activo', 'created_at'];
-        $columna = in_array($this->ordenarPor, $ordenables, true) ? $this->ordenarPor : 'created_at';
+        $columna = array_key_exists($this->ordenarPor, self::ORDENABLES) ? $this->ordenarPor : 'created_at';
 
         return Equipo::query()
             ->with(['empresa', 'area', 'marca', 'modelo'])
@@ -403,7 +429,7 @@ new #[Title('Equipos')] class extends Component {
             $this->modeloNombre = '';
         }
 
-        if (str_starts_with($propiedad, 'filtro') || in_array($propiedad, ['buscar', 'porPagina'], true)) {
+        if (str_starts_with($propiedad, 'filtro') || in_array($propiedad, ['buscar', 'porPagina', 'ordenarPor'], true)) {
             $this->resetPage();
 
             return;
@@ -426,6 +452,19 @@ new #[Title('Equipos')] class extends Component {
         }
 
         $this->resetPage();
+    }
+
+    /** Alterna sólo la dirección: en tarjetas la columna la fija el desplegable. */
+    public function alternarDireccion(): void
+    {
+        $this->ordenDireccion = $this->ordenDireccion === 'asc' ? 'desc' : 'asc';
+
+        $this->resetPage();
+    }
+
+    public function cambiarVista(string $vista): void
+    {
+        $this->vista = array_key_exists($vista, self::VISTAS) ? $vista : 'cards';
     }
 
     public function limpiarFiltros(): void
@@ -1000,7 +1039,7 @@ new #[Title('Equipos')] class extends Component {
         </div>
     </div>
 
-    {{-- ───────────────── Tabla ───────────────── --}}
+    {{-- ───────────────── Listado ───────────────── --}}
     <div class="eq-panel overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
             <p class="flex items-center gap-2 text-[13px] font-semibold text-carbon dark:text-zinc-200">
@@ -1010,148 +1049,60 @@ new #[Title('Equipos')] class extends Component {
                 </span>
             </p>
 
-            <div class="flex items-center gap-2">
-                <label class="text-[12px] text-zinc-500 dark:text-zinc-400" for="f-por-pagina">Mostrar</label>
-                <select id="f-por-pagina" class="eq-select !w-auto !py-1.5 !text-[12px]" wire:model.live="porPagina">
-                    @foreach ([10, 25, 50, 100] as $cantidad)
-                        <option value="{{ $cantidad }}">{{ $cantidad }}</option>
+            <div class="flex flex-wrap items-center gap-3">
+                {{-- En tarjetas no hay cabecera que pulsar: el orden se elige aquí. --}}
+                @if ($vista === 'cards')
+                    <div class="flex items-center gap-2">
+                        <label class="text-[12px] text-zinc-500 dark:text-zinc-400" for="f-ordenar">Ordenar</label>
+                        <select id="f-ordenar" class="eq-select !w-auto !py-1.5 !text-[12px]" wire:model.live="ordenarPor">
+                            @foreach ($this::ORDENABLES as $clave => $titulo)
+                                <option value="{{ $clave }}">{{ $titulo }}</option>
+                            @endforeach
+                        </select>
+
+                        <button
+                            type="button"
+                            wire:click="alternarDireccion"
+                            title="{{ $ordenDireccion === 'asc' ? 'Orden ascendente' : 'Orden descendente' }}"
+                            class="eq-icon-btn !size-8 border border-zinc-200 dark:border-zinc-700"
+                        >
+                            <flux:icon name="{{ $ordenDireccion === 'asc' ? 'bars-arrow-up' : 'bars-arrow-down' }}" variant="mini" class="size-4" />
+                        </button>
+                    </div>
+                @endif
+
+                <div class="flex items-center gap-2">
+                    <label class="text-[12px] text-zinc-500 dark:text-zinc-400" for="f-por-pagina">Mostrar</label>
+                    <select id="f-por-pagina" class="eq-select !w-auto !py-1.5 !text-[12px]" wire:model.live="porPagina">
+                        @foreach ([10, 25, 50, 100] as $cantidad)
+                            <option value="{{ $cantidad }}">{{ $cantidad }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Tarjetas para explorar, tabla para comparar y ordenar. --}}
+                <div class="flex items-center gap-0.5 rounded-xl border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-700 dark:bg-zinc-800/60" role="group" aria-label="Vista del listado">
+                    @foreach ($this::VISTAS as $clave => $opcion)
+                        <button
+                            type="button"
+                            wire:click="cambiarVista('{{ $clave }}')"
+                            title="Ver en {{ mb_strtolower($opcion['titulo']) }}"
+                            aria-pressed="{{ $vista === $clave ? 'true' : 'false' }}"
+                            @class([
+                                'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition duration-200 outline-none focus-visible:ring-4 focus-visible:ring-lima/30',
+                                'bg-white text-carbon shadow-sm dark:bg-zinc-900 dark:text-zinc-100' => $vista === $clave,
+                                'text-zinc-500 hover:text-carbon dark:text-zinc-400 dark:hover:text-zinc-200' => $vista !== $clave,
+                            ])
+                        >
+                            <flux:icon name="{{ $opcion['icono'] }}" variant="mini" class="size-4" />
+                            <span class="hidden sm:inline">{{ $opcion['titulo'] }}</span>
+                        </button>
                     @endforeach
-                </select>
+                </div>
             </div>
         </div>
 
-        <div wire:loading.delay.class="opacity-50" class="overflow-x-auto transition-opacity">
-            <table class="w-full min-w-5xl text-left text-[13px]">
-                <thead class="bg-zinc-50/80 text-[11px] font-bold tracking-wide text-zinc-500 uppercase dark:bg-zinc-800/60 dark:text-zinc-400">
-                    <tr>
-                        @php
-                            $columnas = [
-                                ['clave' => 'numero_serie', 'titulo' => 'N.º de serie', 'ordenable' => true],
-                                ['clave' => 'descripcion', 'titulo' => 'Equipo', 'ordenable' => true],
-                                ['clave' => null, 'titulo' => 'Empresa / Área', 'ordenable' => false],
-                                ['clave' => null, 'titulo' => 'Marca / Modelo', 'ordenable' => false],
-                                ['clave' => null, 'titulo' => 'Observaciones técnicas', 'ordenable' => false],
-                                ['clave' => null, 'titulo' => 'Mantenimiento', 'ordenable' => false],
-                                ['clave' => 'activo', 'titulo' => 'Estado', 'ordenable' => true],
-                            ];
-                        @endphp
-
-                        @foreach ($columnas as $columna)
-                            <th scope="col" class="px-4 py-3 font-bold whitespace-nowrap">
-                                @if ($columna['ordenable'])
-                                    <button type="button" class="inline-flex cursor-pointer items-center gap-1 transition hover:text-lima" wire:click="ordenar('{{ $columna['clave'] }}')">
-                                        {{ $columna['titulo'] }}
-                                        @if ($ordenarPor === $columna['clave'])
-                                            <flux:icon name="{{ $ordenDireccion === 'asc' ? 'chevron-up' : 'chevron-down' }}" variant="micro" class="size-3 text-lima" />
-                                        @else
-                                            <flux:icon name="chevron-up-down" variant="micro" class="size-3 opacity-40" />
-                                        @endif
-                                    </button>
-                                @else
-                                    {{ $columna['titulo'] }}
-                                @endif
-                            </th>
-                        @endforeach
-                    </tr>
-                </thead>
-
-                <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
-                    @forelse ($this->equipos as $equipo)
-                        <tr
-                            wire:key="equipo-{{ $equipo->id }}"
-                            tabindex="0"
-                            wire:click="verEquipo({{ $equipo->id }})"
-                            wire:keydown.enter="verEquipo({{ $equipo->id }})"
-                            title="Ver la ficha de {{ $equipo->descripcion }}"
-                            class="cursor-pointer transition duration-150 outline-none hover:bg-lima-soft/40 focus-visible:bg-lima-soft/60 dark:hover:bg-zinc-800/50 dark:focus-visible:bg-zinc-800/70"
-                        >
-                            <td class="px-4 py-3 align-top font-mono text-[12px] text-zinc-600 dark:text-zinc-300">{{ $equipo->numero_serie ?: '—' }}</td>
-
-                            <td class="px-4 py-3 align-top">
-                                <div class="flex items-center gap-3">
-                                    <span class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-carbon to-carbon-deep text-[11px] font-bold text-white shadow-sm">
-                                        @if ($equipo->fotoUrl())
-                                            <img src="{{ $equipo->fotoUrl() }}" alt="{{ $equipo->descripcion }}" class="size-full object-cover">
-                                        @else
-                                            {{ $equipo->iniciales() }}
-                                        @endif
-                                    </span>
-
-                                    <div class="min-w-0">
-                                        <p class="font-semibold text-carbon dark:text-zinc-100">{{ $equipo->descripcion }}</p>
-                                        @if ($equipo->clasificacion_riesgo)
-                                            <span class="eq-chip mt-0.5 bg-signal/10 text-signal-600 dark:text-signal">Riesgo {{ $equipo->clasificacion_riesgo }}</span>
-                                        @endif
-                                    </div>
-                                </div>
-                            </td>
-
-                            <td class="px-4 py-3 align-top">
-                                <p class="font-medium text-carbon dark:text-zinc-200">{{ $equipo->empresa?->nombre ?? '—' }}</p>
-                                <p class="text-[12px] text-zinc-500 dark:text-zinc-400">{{ $equipo->area?->nombre ?? 'Sin área' }}</p>
-                            </td>
-
-                            <td class="px-4 py-3 align-top">
-                                <p class="font-medium text-carbon dark:text-zinc-200">{{ $equipo->marca?->nombre ?? '—' }}</p>
-                                <p class="text-[12px] text-zinc-500 dark:text-zinc-400">{{ $equipo->modelo?->nombre ?? '—' }}</p>
-                            </td>
-
-                            <td class="max-w-56 px-4 py-3 align-top text-zinc-600 dark:text-zinc-300">
-                                <span class="line-clamp-2" title="{{ $equipo->observaciones_tecnicas }}">{{ $equipo->observaciones_tecnicas ?: '—' }}</span>
-                            </td>
-
-                            <td class="max-w-56 px-4 py-3 align-top text-zinc-600 dark:text-zinc-300">
-                                <span class="line-clamp-2" title="{{ $equipo->mantenimiento }}">{{ $equipo->mantenimiento ?: '—' }}</span>
-                            </td>
-
-                            <td class="px-4 py-3 align-top">
-                                <button
-                                    type="button"
-                                    wire:click.stop="alternarActivo({{ $equipo->id }})"
-                                    title="Cambiar estado"
-                                    @class([
-                                        'eq-chip cursor-pointer transition duration-200 hover:scale-110 hover:shadow-md',
-                                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' => $equipo->activo,
-                                        'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400' => ! $equipo->activo,
-                                    ])
-                                >
-                                    <span @class([
-                                        'size-1.5 rounded-full',
-                                        'bg-emerald-500' => $equipo->activo,
-                                        'bg-rose-500' => ! $equipo->activo,
-                                    ])></span>
-                                    {{ $equipo->activo ? 'Activo' : 'Fuera de servicio' }}
-                                </button>
-                            </td>
-
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="px-4 py-16 text-center">
-                                <div class="mx-auto flex max-w-sm flex-col items-center gap-3">
-                                    <span class="flex size-14 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
-                                        <flux:icon name="cpu-chip" class="size-7 text-zinc-400" />
-                                    </span>
-                                    <p class="text-[15px] font-semibold text-carbon dark:text-zinc-200">
-                                        {{ $this->hayFiltrosActivos ? 'Ningún equipo coincide con los filtros' : 'Todavía no hay equipos registrados' }}
-                                    </p>
-                                    <p class="text-[13px] text-zinc-500 dark:text-zinc-400">
-                                        {{ $this->hayFiltrosActivos ? 'Ajuste o limpie los filtros para ver más resultados.' : 'Registre el primer equipo del inventario para empezar.' }}
-                                    </p>
-                                    @if ($this->hayFiltrosActivos)
-                                        <button type="button" class="eq-btn eq-btn-ghost" wire:click="limpiarFiltros">Limpiar filtros</button>
-                                    @else
-                                        <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
-                                            <flux:icon name="plus" variant="mini" class="size-4" /> Añadir equipo
-                                        </button>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        @include('pages.equipos.partials.lista-'.$vista)
 
         @if ($this->equipos->hasPages())
             <div class="border-t border-zinc-200 px-5 py-4 dark:border-zinc-800">

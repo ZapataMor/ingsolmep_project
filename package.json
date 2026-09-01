@@ -3,7 +3,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "concurrently \"php artisan serve\" \"php artisan serve\"",
+        "dev": "concurrently \"php artisan serve\" \"npm run vite\"",
         "vite": "vite",
         "build": "vite build"
     },

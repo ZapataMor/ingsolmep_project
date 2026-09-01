@@ -194,3 +194,90 @@ select:focus[data-flux-control] {
 .eq-input:disabled {
     @apply cursor-not-allowed bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500;
 }
+
+/* --- Barra lateral --- */
+.eq-brand {
+    @apply flex h-10 min-w-0 items-center gap-1.5 px-2 font-ing;
+}
+
+.eq-brand-name {
+    @apply truncate text-[19px] font-semibold tracking-[-0.02em] text-carbon dark:text-white;
+}
+
+.eq-brand-mark {
+    @apply text-lima;
+}
+
+.eq-brand-suffix {
+    @apply shrink-0 text-[11px] font-medium text-zinc-500 dark:text-zinc-400;
+}
+
+/* Módulo activo: el contenedor completo se pinta de lima. */
+.eq-navitem[data-current] {
+    @apply border-lima! bg-lima! text-white! shadow-sm shadow-lima/30;
+}
+
+.eq-navitem[data-current]:hover {
+    @apply bg-lima-600! border-lima-600! text-white!;
+}
+
+/* Nombres e íconos de los módulos, más grandes que el tamaño de Flux
+   (h-8 / text-sm / size-4). Estas reglas van sin `@layer`, así ganan
+   siempre a las utilidades de Tailwind que aplica el componente. */
+.eq-navitem {
+    height: 2.75rem;
+    gap: 0.875rem;
+}
+
+.eq-navitem [data-content] {
+    font-size: 15.5px;
+    line-height: 1.5rem;
+}
+
+.eq-navitem svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+/* --- Barra lateral colapsada (sólo íconos) --- */
+[data-flux-sidebar] {
+    transition: width 200ms ease;
+}
+
+/* Flux colapsa a w-14; con íconos de 24px hace falta algo más de aire. */
+[data-flux-sidebar][data-flux-sidebar-collapsed-desktop] {
+    width: 4.5rem;
+}
+
+[data-flux-sidebar-collapsed-desktop] .eq-navitem {
+    width: 3rem;
+    padding-inline: 0;
+}
+
+.eq-brand-full {
+    @apply flex min-w-0 items-center gap-1.5;
+}
+
+.eq-brand-badge {
+    @apply hidden size-9 shrink-0 items-center justify-center rounded-lg bg-lima text-[17px] font-bold text-white;
+}
+
+[data-flux-sidebar-collapsed-desktop] .eq-brand {
+    width: 3rem;
+    justify-content: center;
+    padding-inline: 0;
+}
+
+[data-flux-sidebar-collapsed-desktop] .eq-brand-full {
+    display: none;
+}
+
+[data-flux-sidebar-collapsed-desktop] .eq-brand-badge {
+    display: flex;
+}
+
+/* Al apuntar la barra colapsada, el botón de expandir toma el lugar
+   de la marca (mismo comportamiento que `flux:sidebar.brand`). */
+[data-flux-sidebar-collapsed-desktop][data-flux-sidebar-active] .eq-brand {
+    opacity: 0;
+}

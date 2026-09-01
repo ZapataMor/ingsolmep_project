@@ -18,6 +18,10 @@
                 <flux:sidebar.item class="eq-navitem" icon="cpu-chip" :href="route('equipos.index')" :current="request()->routeIs('equipos.*')" wire:navigate>
                     {{ __('Equipos') }}
                 </flux:sidebar.item>
+
+                <flux:sidebar.item class="eq-navitem" icon="building-office-2" :href="route('empresas.index')" :current="request()->routeIs('empresas.*')" wire:navigate>
+                    {{ __('Empresas') }}
+                </flux:sidebar.item>
             </flux:sidebar.nav>
 
             <flux:spacer />

@@ -177,6 +177,50 @@ select:focus[data-flux-control] {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap;
 }
 
+/* --- Modales ---
+   La presencia del modal la decide el servidor (`@if` en el parcial), no
+   `x-show`: ligado a `$wire`, en los modales teletransportados al <body> la
+   reactividad de Alpine llega un paso atrasada y el modal no abre. La entrada
+   se anima con CSS y el bloqueo del fondo sale de `:has()`, sin JavaScript. */
+.eq-modal {
+    animation: eq-modal-fade 200ms ease-out both;
+}
+
+.eq-modal-panel {
+    animation: eq-modal-rise 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes eq-modal-fade {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes eq-modal-rise {
+    from {
+        opacity: 0;
+        transform: translateY(1.5rem) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+body:has(.eq-modal) {
+    overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .eq-modal,
+    .eq-modal-panel {
+        animation: none;
+    }
+}
+
 /* --- Wizard --- */
 .eq-step-dot {
     @apply flex size-9 shrink-0 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-all duration-300;

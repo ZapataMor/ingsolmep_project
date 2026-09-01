@@ -8,26 +8,50 @@
     </div>
 
     <div>
-        <label class="eq-label" for="eq-marca">Marca <span class="eq-req">*</span></label>
-        <input id="eq-marca" type="text" class="eq-input" list="eq-lista-marcas" wire:model.live.debounce.400ms="marcaNombre" placeholder="Ej: PHILIPS" autocomplete="off">
-        <datalist id="eq-lista-marcas">
-            @foreach ($marcasSugeridas as $marca)
-                <option value="{{ $marca->nombre }}"></option>
-            @endforeach
-        </datalist>
-        <span class="eq-hint">Escriba una nueva o elija de la lista.</span>
+        <div class="mb-1.5 flex items-baseline justify-between gap-2">
+            <label class="eq-label !mb-0" for="eq-marca">Marca <span class="eq-req">*</span></label>
+            <button type="button" class="eq-enlace" wire:click="alternarMarcaNueva">
+                @if ($marcaNueva) Elegir de la lista @else + Agregar marca nueva @endif
+            </button>
+        </div>
+
+        @if ($marcaNueva)
+            <input id="eq-marca" type="text" class="eq-input" wire:model.live.debounce.500ms="marcaNombre" placeholder="Ej: PHILIPS" autocomplete="off">
+            <span class="eq-hint">Se registrará al guardar el equipo.</span>
+        @else
+            <select id="eq-marca" class="eq-select" wire:model.live="marcaNombre">
+                <option value="">Seleccione marca</option>
+                @foreach ($marcasSugeridas as $marca)
+                    <option value="{{ $marca->nombre }}">{{ $marca->nombre }}</option>
+                @endforeach
+            </select>
+            <span class="eq-hint">Marcas ya registradas en el inventario.</span>
+        @endif
+
         @error('marcaNombre') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
     </div>
 
     <div>
-        <label class="eq-label" for="eq-modelo">Modelo <span class="eq-req">*</span></label>
-        <input id="eq-modelo" type="text" class="eq-input" list="eq-lista-modelos" wire:model="modeloNombre" placeholder="Ej: SE-1" autocomplete="off">
-        <datalist id="eq-lista-modelos">
-            @foreach ($modelosSugeridos as $modelo)
-                <option value="{{ $modelo->nombre }}"></option>
-            @endforeach
-        </datalist>
-        <span class="eq-hint">Se asocia a la marca indicada.</span>
+        <div class="mb-1.5 flex items-baseline justify-between gap-2">
+            <label class="eq-label !mb-0" for="eq-modelo">Modelo <span class="eq-req">*</span></label>
+            <button type="button" class="eq-enlace" wire:click="alternarModeloNuevo" @disabled($marcaNueva || $marcaNombre === '')>
+                @if ($modeloNuevo) Elegir de la lista @else + Agregar modelo nuevo @endif
+            </button>
+        </div>
+
+        @if ($modeloNuevo)
+            <input id="eq-modelo" type="text" class="eq-input" wire:model="modeloNombre" placeholder="Ej: SE-1" autocomplete="off" @disabled($marcaNombre === '')>
+        @else
+            <select id="eq-modelo" class="eq-select" wire:model="modeloNombre" @disabled($marcaNombre === '')>
+                <option value="">@if ($marcaNombre === '') Seleccione primero la marca @else Seleccione modelo @endif</option>
+                @foreach ($modelosSugeridos as $modelo)
+                    <option value="{{ $modelo->nombre }}">{{ $modelo->nombre }}</option>
+                @endforeach
+            </select>
+        @endif
+
+        <span class="eq-hint">@if ($marcaNombre === '') Se habilita al elegir la marca. @else Modelos de {{ $marcaNombre }}. @endif</span>
+
         @error('modeloNombre') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
     </div>
 
@@ -113,14 +137,25 @@
                 </div>
 
                 <div>
-                    <label class="eq-label" for="eq-area">Área / servicio</label>
-                    <input id="eq-area" type="text" class="eq-input" list="eq-lista-areas" wire:model="areaNombre" placeholder="Ej: Consultorio médico #1" autocomplete="off" @disabled(! $empresa_id)>
-                    <datalist id="eq-lista-areas">
-                        @foreach ($areasSugeridas as $area)
-                            <option value="{{ $area->nombre }}"></option>
-                        @endforeach
-                    </datalist>
-                    <span class="eq-hint">@if ($empresa_id) Escriba una nueva o elija de la lista. @else Seleccione primero una empresa. @endif</span>
+                    <div class="mb-1.5 flex items-baseline justify-between gap-2">
+                        <label class="eq-label !mb-0" for="eq-area">Área / servicio</label>
+                        <button type="button" class="eq-enlace" wire:click="alternarAreaNueva" @disabled(! $empresa_id)>
+                            @if ($areaNueva) Elegir de la lista @else + Agregar área nueva @endif
+                        </button>
+                    </div>
+
+                    @if ($areaNueva)
+                        <input id="eq-area" type="text" class="eq-input" wire:model="areaNombre" placeholder="Ej: Consultorio médico #1" autocomplete="off" @disabled(! $empresa_id)>
+                    @else
+                        <select id="eq-area" class="eq-select" wire:model="areaNombre" @disabled(! $empresa_id)>
+                            <option value="">@if ($empresa_id) Sin área asignada @else Seleccione primero la empresa @endif</option>
+                            @foreach ($areasSugeridas as $area)
+                                <option value="{{ $area->nombre }}">{{ $area->nombre }}</option>
+                            @endforeach
+                        </select>
+                    @endif
+
+                    <span class="eq-hint">@if ($empresa_id) Áreas registradas para esta empresa. @else Seleccione primero una empresa. @endif</span>
                 </div>
 
                 <div>

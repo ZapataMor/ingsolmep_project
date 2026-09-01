@@ -80,6 +80,14 @@ new #[Title('Equipos')] class extends Component {
 
     public string $modeloNombre = '';
 
+    // Cada desplegable de catálogo puede cambiarse por un campo de texto para
+    // dar de alta un valor que todavía no existe.
+    public bool $areaNueva = false;
+
+    public bool $marcaNueva = false;
+
+    public bool $modeloNuevo = false;
+
     public string $descripcion = '';
 
     public string $numero_serie = '';
@@ -300,6 +308,14 @@ new #[Title('Equipos')] class extends Component {
 
         if ($propiedad === 'empresa_id') {
             $this->areaNombre = '';
+            $this->areaNueva = false;
+        }
+
+        // Al cambiar de marca en el desplegable, el modelo elegido deja de ser
+        // válido. Escribiendo una marca nueva no se toca, porque su modelo
+        // también se está escribiendo a mano.
+        if ($propiedad === 'marcaNombre' && ! $this->marcaNueva) {
+            $this->modeloNombre = '';
         }
 
         if (str_starts_with($propiedad, 'filtro') || in_array($propiedad, ['buscar', 'porPagina'], true)) {
@@ -384,6 +400,33 @@ new #[Title('Equipos')] class extends Component {
         $this->paso = 1;
         $this->pasoMaximo = count(self::PASOS);
         $this->mostrarFormulario = true;
+    }
+
+    /**
+     * Alterna entre elegir una marca del desplegable y escribir una nueva.
+     * Una marca nueva no tiene modelos, así que su modelo también se escribe.
+     */
+    public function alternarMarcaNueva(): void
+    {
+        $this->marcaNueva = ! $this->marcaNueva;
+        $this->marcaNombre = '';
+        $this->modeloNombre = '';
+        $this->modeloNuevo = $this->marcaNueva;
+        $this->resetValidation(['marcaNombre', 'modeloNombre']);
+    }
+
+    public function alternarModeloNuevo(): void
+    {
+        $this->modeloNuevo = ! $this->modeloNuevo;
+        $this->modeloNombre = '';
+        $this->resetValidation('modeloNombre');
+    }
+
+    public function alternarAreaNueva(): void
+    {
+        $this->areaNueva = ! $this->areaNueva;
+        $this->areaNombre = '';
+        $this->resetValidation('areaNombre');
     }
 
     public function siguiente(): void
@@ -562,6 +605,7 @@ new #[Title('Equipos')] class extends Component {
             'descripcion', 'numero_serie', 'registro_invima', 'clasificacion_riesgo',
             'clasificacion_especialidad', 'fabricante', 'pais_origen', 'telefono_fabricante',
             'tipo_adquisicion', 'prioridad', 'observaciones_tecnicas', 'observaciones_generales',
+            'areaNueva', 'marcaNueva', 'modeloNuevo',
             'mantenimiento', 'activo', 'foto', 'fotoActual', 'suministro_electrico',
             'voltaje', 'amperaje', 'frecuencia', 'corriente', 'potencia', 'voltios',
             'temperatura', 'presion', 'peso', 'velocidad', 'tecnologia_predominante',

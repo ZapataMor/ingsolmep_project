@@ -181,3 +181,16 @@ select:focus[data-flux-control] {
 .eq-step-dot {
     @apply flex size-9 shrink-0 items-center justify-center rounded-full border-2 text-[13px] font-bold transition-all duration-300;
 }
+
+.eq-enlace {
+    @apply cursor-pointer border-b border-transparent pb-px text-[11.5px] font-semibold text-signal transition duration-150 outline-none
+           hover:border-lima hover:text-lima-700
+           focus-visible:ring-2 focus-visible:ring-lima/40
+           disabled:cursor-not-allowed disabled:text-zinc-400 disabled:opacity-60 disabled:hover:border-transparent
+           dark:hover:text-lima;
+}
+
+.eq-select:disabled,
+.eq-input:disabled {
+    @apply cursor-not-allowed bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500;
+}

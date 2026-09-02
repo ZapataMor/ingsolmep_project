@@ -10,11 +10,15 @@
     <body class="min-h-screen bg-white dark:bg-zinc-800">
         <flux:sidebar sticky collapsible class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
             <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('equipos.index') }}" wire:navigate />
+                <x-app-logo :sidebar="true" href="{{ route('panel') }}" wire:navigate />
                 <flux:sidebar.collapse :tooltip="__('Contraer o expandir el menú')" />
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
+                <flux:sidebar.item class="eq-navitem" icon="squares-2x2" :href="route('panel')" :current="request()->routeIs('panel')" wire:navigate>
+                    {{ __('Panel') }}
+                </flux:sidebar.item>
+
                 <flux:sidebar.item class="eq-navitem" icon="cpu-chip" :href="route('equipos.index')" :current="request()->routeIs('equipos.*')" wire:navigate>
                     {{ __('Equipos') }}
                 </flux:sidebar.item>

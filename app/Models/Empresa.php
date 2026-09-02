@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -52,6 +54,22 @@ class Empresa extends Model
     public function mantenimientos(): HasMany
     {
         return $this->hasMany(Mantenimiento::class);
+    }
+
+    /**
+     * Instituciones que tienen órdenes programadas para el mes dado y todavía
+     * no han ejecutado ninguna de ellas: el cronograma del mes sin arrancar.
+     *
+     * @param  Builder<self>  $consulta
+     */
+    public function scopeCronogramaSinIniciar(Builder $consulta, CarbonInterface $mes): void
+    {
+        $consulta
+            ->whereHas('mantenimientos', fn (Builder $orden) => $orden->programadosEnElMes($mes))
+            ->whereDoesntHave('mantenimientos', fn (Builder $orden) => $orden
+                ->programadosEnElMes($mes)
+                ->where('estado', 'ejecutado')
+            );
     }
 
     /**

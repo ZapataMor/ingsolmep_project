@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -21,29 +22,59 @@ new #[Title('Mantenimientos')] class extends Component {
     // Filtros del listado
     // ------------------------------------------------------------------
 
+    #[Url(as: 'q')]
     public string $buscar = '';
 
+    #[Url(as: 'tipo')]
     public string $filtroTipo = '';
 
+    #[Url(as: 'estado')]
     public string $filtroEstado = '';
 
+    #[Url(as: 'empresa')]
     public string $filtroEmpresa = '';
 
+    #[Url(as: 'prioridad')]
     public string $filtroPrioridad = '';
 
+    #[Url(as: 'tecnico')]
     public string $filtroTecnico = '';
 
+    #[Url(as: 'desde')]
     public string $filtroDesde = '';
 
+    #[Url(as: 'hasta')]
     public string $filtroHasta = '';
 
     /** Acota el listado a los pendientes cuya fecha programada ya pasó. */
+    #[Url(as: 'vencidos')]
     public bool $soloVencidos = false;
+
+    /**
+     * Situación concreta que trae el usuario desde el panel principal. Cada
+     * valor apunta al mismo scope con el que el panel contó la cifra, así lo
+     * que se ve aquí es exactamente lo que decía el indicador.
+     */
+    #[Url(as: 'bandeja')]
+    public string $filtroBandeja = '';
+
+    /**
+     * Situaciones que enlaza el panel, con el rótulo que se muestra al llegar.
+     *
+     * @var array<string, string>
+     */
+    public const BANDEJAS = [
+        'estancados' => 'Correctivos abiertos hace más de 15 días',
+        'mes' => 'Cronograma del mes en curso',
+        'novedad' => 'Órdenes con novedad reportada sin correctivo posterior',
+    ];
 
     public int $porPagina = 10;
 
+    #[Url(as: 'orden')]
     public string $ordenarPor = 'fecha_programada';
 
+    #[Url(as: 'dir')]
     public string $ordenDireccion = 'desc';
 
     // ------------------------------------------------------------------
@@ -336,7 +367,8 @@ new #[Title('Mantenimientos')] class extends Component {
             || $this->filtroTecnico !== ''
             || $this->filtroDesde !== ''
             || $this->filtroHasta !== ''
-            || $this->soloVencidos;
+            || $this->soloVencidos
+            || $this->filtroBandeja !== '';
     }
 
     // ------------------------------------------------------------------
@@ -387,6 +419,7 @@ new #[Title('Mantenimientos')] class extends Component {
         $this->reset([
             'buscar', 'filtroTipo', 'filtroEstado', 'filtroEmpresa',
             'filtroPrioridad', 'filtroTecnico', 'filtroDesde', 'filtroHasta', 'soloVencidos',
+            'filtroBandeja',
         ]);
 
         $this->resetPage();
@@ -647,7 +680,28 @@ new #[Title('Mantenimientos')] class extends Component {
             ->when($this->filtroTecnico !== '', fn (Builder $q) => $q->where('tecnico', $this->filtroTecnico))
             ->when($this->filtroDesde !== '', fn (Builder $q) => $q->whereDate('fecha_programada', '>=', $this->filtroDesde))
             ->when($this->filtroHasta !== '', fn (Builder $q) => $q->whereDate('fecha_programada', '<=', $this->filtroHasta))
-            ->when($this->soloVencidos, fn (Builder $q) => $q->vencidos());
+            ->when($this->soloVencidos, fn (Builder $q) => $q->vencidos())
+            ->when($this->filtroBandeja !== '', fn (Builder $q) => $this->aplicarBandeja($q));
+    }
+
+    /**
+     * Traduce la situación que trae el usuario desde el panel al mismo scope
+     * con el que allí se contó. Es lo que garantiza que la cifra del indicador
+     * y el número de resultados de este listado coincidan.
+     *
+     * @param  Builder<Mantenimiento>  $consulta
+     */
+    private function aplicarBandeja(Builder $consulta): void
+    {
+        match ($this->filtroBandeja) {
+            'estancados' => $consulta->estancados(),
+            'mes' => $consulta->programadosEnElMes(Date::today()),
+            'novedad' => $consulta->where('tipo', 'preventivo')
+                ->where('presenta_novedad', true)
+                ->where('estado', 'ejecutado')
+                ->whereIn('equipo_id', Equipo::query()->conNovedadPendiente()->select('id')),
+            default => null,
+        };
     }
 
     /**
@@ -831,6 +885,21 @@ new #[Title('Mantenimientos')] class extends Component {
             </button>
         @endforeach
     </div>
+
+    {{-- ───────────────── Procedencia del panel ─────────────────
+         Al llegar desde un indicador, el listado aparece ya acotado. Sin este
+         aviso el usuario no sabría por qué ve menos órdenes de las que espera. --}}
+    @if (array_key_exists($filtroBandeja, static::BANDEJAS))
+        <div class="eq-panel flex flex-wrap items-center justify-between gap-3 border-signal/30 bg-signal/5 px-5 py-3 dark:border-signal/25 dark:bg-signal/10">
+            <p class="text-[13px] text-carbon dark:text-zinc-200">
+                Mostrando sólo: <span class="font-semibold">{{ static::BANDEJAS[$filtroBandeja] }}</span>
+            </p>
+
+            <button type="button" class="eq-enlace" wire:click="$set('filtroBandeja', '')">
+                Ver todas las órdenes
+            </button>
+        </div>
+    @endif
 
     {{-- ───────────────── Filtros ───────────────── --}}
     <div class="eq-panel p-5">

@@ -15,6 +15,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -61,21 +62,50 @@ new #[Title('Equipos')] class extends Component {
     // Filtros del listado
     // ------------------------------------------------------------------
 
+    #[Url(as: 'q')]
     public string $buscar = '';
 
+    #[Url(as: 'empresa')]
     public string $filtroEmpresa = '';
 
+    #[Url(as: 'area')]
     public string $filtroArea = '';
 
+    #[Url(as: 'marca')]
     public string $filtroMarca = '';
 
+    #[Url(as: 'modelo')]
     public string $filtroModelo = '';
 
+    #[Url(as: 'serie')]
     public string $filtroSerie = '';
 
+    #[Url(as: 'riesgo')]
     public string $filtroRiesgo = '';
 
+    #[Url(as: 'activo')]
     public string $filtroActivo = '';
+
+    /**
+     * Situación concreta que trae el usuario desde el panel principal. Cada
+     * valor apunta al mismo scope con el que allí se contó la cifra, así el
+     * número del indicador y el de este listado son el mismo por construcción.
+     */
+    #[Url(as: 'bandeja')]
+    public string $filtroBandeja = '';
+
+    /**
+     * Situaciones que enlaza el panel, con el rótulo que se muestra al llegar.
+     *
+     * @var array<string, string>
+     */
+    public const BANDEJAS = [
+        'novedad' => 'Equipos con novedad reportada sin correctivo abierto',
+        'garantia' => 'Equipos cuya garantía vence en los próximos 60 días',
+        'sin_mantenimiento' => 'Equipos sin mantenimiento hace más de 6 meses',
+        'incompletos' => 'Equipos con datos incompletos',
+        'fuera_servicio' => 'Equipos fuera de servicio',
+    ];
 
     public int $porPagina = 10;
 
@@ -83,8 +113,10 @@ new #[Title('Equipos')] class extends Component {
     #[Session(key: 'equipos.vista')]
     public string $vista = 'cards';
 
+    #[Url(as: 'orden')]
     public string $ordenarPor = 'created_at';
 
+    #[Url(as: 'dir')]
     public string $ordenDireccion = 'desc';
 
     // ------------------------------------------------------------------
@@ -271,8 +303,28 @@ new #[Title('Equipos')] class extends Component {
             ->when($this->filtroSerie !== '', fn (Builder $q) => $q->where('numero_serie', 'like', '%'.$this->filtroSerie.'%'))
             ->when($this->filtroRiesgo !== '', fn (Builder $q) => $q->where('clasificacion_riesgo', $this->filtroRiesgo))
             ->when($this->filtroActivo !== '', fn (Builder $q) => $q->where('activo', $this->filtroActivo === '1'))
+            ->when($this->filtroBandeja !== '', fn (Builder $q) => $this->aplicarBandeja($q))
             ->orderBy($columna, $this->ordenDireccion === 'asc' ? 'asc' : 'desc')
             ->paginate($this->porPagina);
+    }
+
+    /**
+     * Traduce la situación que trae el usuario desde el panel al mismo scope
+     * con el que allí se contó. Es lo que garantiza que la cifra del indicador
+     * y el número de resultados de este listado coincidan.
+     *
+     * @param  Builder<Equipo>  $consulta
+     */
+    private function aplicarBandeja(Builder $consulta): void
+    {
+        match ($this->filtroBandeja) {
+            'novedad' => $consulta->conNovedadPendiente(),
+            'garantia' => $consulta->garantiaPorVencer(),
+            'sin_mantenimiento' => $consulta->sinMantenimiento(),
+            'incompletos' => $consulta->datosIncompletos(),
+            'fuera_servicio' => $consulta->fueraDeServicio(),
+            default => null,
+        };
     }
 
     /** @return array<string, int> */
@@ -400,7 +452,8 @@ new #[Title('Equipos')] class extends Component {
             || $this->filtroModelo !== ''
             || $this->filtroSerie !== ''
             || $this->filtroRiesgo !== ''
-            || $this->filtroActivo !== '';
+            || $this->filtroActivo !== ''
+            || $this->filtroBandeja !== '';
     }
 
     // ------------------------------------------------------------------
@@ -471,7 +524,7 @@ new #[Title('Equipos')] class extends Component {
     {
         $this->reset([
             'buscar', 'filtroEmpresa', 'filtroArea', 'filtroMarca',
-            'filtroModelo', 'filtroSerie', 'filtroRiesgo', 'filtroActivo',
+            'filtroModelo', 'filtroSerie', 'filtroRiesgo', 'filtroActivo', 'filtroBandeja',
         ]);
 
         $this->resetPage();
@@ -952,6 +1005,21 @@ new #[Title('Equipos')] class extends Component {
             </button>
         @endforeach
     </div>
+
+    {{-- ───────────────── Procedencia del panel ─────────────────
+         Al llegar desde un indicador, el inventario aparece ya acotado. Sin
+         este aviso el usuario no sabría por qué ve menos equipos. --}}
+    @if (array_key_exists($filtroBandeja, static::BANDEJAS))
+        <div class="eq-panel flex flex-wrap items-center justify-between gap-3 border-signal/30 bg-signal/5 px-5 py-3 dark:border-signal/25 dark:bg-signal/10">
+            <p class="text-[13px] text-carbon dark:text-zinc-200">
+                Mostrando sólo: <span class="font-semibold">{{ static::BANDEJAS[$filtroBandeja] }}</span>
+            </p>
+
+            <button type="button" class="eq-enlace" wire:click="$set('filtroBandeja', '')">
+                Ver todo el inventario
+            </button>
+        </div>
+    @endif
 
     {{-- ───────────────── Filtros ───────────────── --}}
     <div class="eq-panel p-5">

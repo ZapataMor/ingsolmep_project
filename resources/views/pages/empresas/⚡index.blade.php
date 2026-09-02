@@ -5,9 +5,11 @@ use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -19,16 +21,33 @@ new #[Title('Empresas')] class extends Component {
     // Filtros del listado
     // ------------------------------------------------------------------
 
+    #[Url(as: 'q')]
     public string $buscar = '';
 
+    #[Url(as: 'ciudad')]
     public string $filtroCiudad = '';
 
+    #[Url(as: 'activo')]
     public string $filtroActivo = '';
+
+    /**
+     * Situación que trae el usuario desde el panel principal, resuelta con el
+     * mismo scope con el que allí se contó la cifra.
+     */
+    #[Url(as: 'bandeja')]
+    public string $filtroBandeja = '';
+
+    /** @var array<string, string> */
+    public const BANDEJAS = [
+        'cronograma' => 'Instituciones con el cronograma del mes sin iniciar',
+    ];
 
     public int $porPagina = 10;
 
+    #[Url(as: 'orden')]
     public string $ordenarPor = 'nombre';
 
+    #[Url(as: 'dir')]
     public string $ordenDireccion = 'asc';
 
     // ------------------------------------------------------------------
@@ -142,6 +161,7 @@ new #[Title('Empresas')] class extends Component {
             })
             ->when($this->filtroCiudad !== '', fn (Builder $q) => $q->where('ciudad', $this->filtroCiudad))
             ->when($this->filtroActivo !== '', fn (Builder $q) => $q->where('activo', $this->filtroActivo === '1'))
+            ->when($this->filtroBandeja === 'cronograma', fn (Builder $q) => $q->cronogramaSinIniciar(Date::today()))
             ->orderBy($columna, $this->ordenDireccion === 'asc' ? 'asc' : 'desc')
             ->paginate($this->porPagina);
     }
@@ -229,7 +249,8 @@ new #[Title('Empresas')] class extends Component {
     {
         return $this->buscar !== ''
             || $this->filtroCiudad !== ''
-            || $this->filtroActivo !== '';
+            || $this->filtroActivo !== ''
+            || $this->filtroBandeja !== '';
     }
 
     // ------------------------------------------------------------------
@@ -265,7 +286,7 @@ new #[Title('Empresas')] class extends Component {
 
     public function limpiarFiltros(): void
     {
-        $this->reset(['buscar', 'filtroCiudad', 'filtroActivo']);
+        $this->reset(['buscar', 'filtroCiudad', 'filtroActivo', 'filtroBandeja']);
 
         $this->resetPage();
     }
@@ -567,6 +588,19 @@ new #[Title('Empresas')] class extends Component {
             </button>
         @endforeach
     </div>
+
+    {{-- ───────────────── Procedencia del panel ───────────────── --}}
+    @if (array_key_exists($filtroBandeja, static::BANDEJAS))
+        <div class="eq-panel flex flex-wrap items-center justify-between gap-3 border-signal/30 bg-signal/5 px-5 py-3 dark:border-signal/25 dark:bg-signal/10">
+            <p class="text-[13px] text-carbon dark:text-zinc-200">
+                Mostrando sólo: <span class="font-semibold">{{ static::BANDEJAS[$filtroBandeja] }}</span>
+            </p>
+
+            <button type="button" class="eq-enlace" wire:click="$set('filtroBandeja', '')">
+                Ver todas las empresas
+            </button>
+        </div>
+    @endif
 
     {{-- ───────────────── Filtros ───────────────── --}}
     <div class="eq-panel p-5">

@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $descripcion
  * @property string|null $numero_serie
  * @property bool $activo
+ * @property string $estado_operativo
  * @property Carbon|null $garantia_vence
  * @property Carbon|null $ultimo_mantenimiento
  * @property array<string, bool>|null $subtareas

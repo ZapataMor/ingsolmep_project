@@ -165,14 +165,28 @@
                     <span class="eq-hint">@if ($empresa_id) Áreas registradas para esta empresa. @else Seleccione primero una empresa. @endif</span>
                 </div>
 
+                {{-- Dos ejes distintos: `activo` dice si el equipo sigue en el
+                     inventario, `estado_operativo` si está prestando servicio.
+                     El panel principal sólo alerta por el segundo. --}}
                 <div>
-                    <label class="eq-label">Estado del equipo</label>
+                    <label class="eq-label">Vigencia en el inventario</label>
                     <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 transition hover:border-lima dark:border-zinc-700 dark:bg-zinc-900">
                         <input type="checkbox" class="size-4 rounded accent-lima" wire:model.live="activo">
                         <span class="text-sm font-medium text-carbon dark:text-zinc-200">
-                            @if ($activo) Activo / en servicio @else Fuera de servicio @endif
+                            @if ($activo) Vigente @else Dado de baja @endif
                         </span>
                     </label>
+                </div>
+
+                <div>
+                    <label class="eq-label" for="eq-estado-operativo">Estado operativo</label>
+                    <select id="eq-estado-operativo" class="eq-select" wire:model="estado_operativo">
+                        @foreach (\App\Models\Equipo::ESTADOS_OPERATIVOS as $valor => $etiqueta)
+                            <option value="{{ $valor }}">{{ $etiqueta }}</option>
+                        @endforeach
+                    </select>
+                    <span class="eq-hint">Un equipo fuera de servicio aparece como problema abierto en el panel.</span>
+                    @error('estado_operativo') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
                 </div>
             </div>
         </div>

@@ -17,7 +17,7 @@
         </p>
     </div>
 
-    @if ($candidatos->isEmpty())
+    @if ($candidatos === [])
         <p class="px-5 py-6 text-center text-[13px] text-zinc-500 dark:text-zinc-400">
             Ningún equipo ha necesitado correctivos en el último año.
         </p>
@@ -38,28 +38,28 @@
                         <tr class="border-b border-zinc-100 last:border-b-0 hover:bg-zinc-50 dark:border-zinc-800/70 dark:hover:bg-zinc-800/50">
                             <td class="max-w-56 px-5 py-2">
                                 <a
-                                    href="{{ route('mantenimientos.index', ['q' => $equipo->numero_serie ?: $equipo->descripcion, 'tipo' => 'correctivo']) }}"
+                                    href="{{ route('mantenimientos.index', ['q' => $equipo['numero_serie'] ?: $equipo['descripcion'], 'tipo' => 'correctivo']) }}"
                                     wire:navigate
                                     class="block truncate font-medium text-carbon hover:underline dark:text-zinc-100"
-                                >{{ $equipo->descripcion }}</a>
+                                >{{ $equipo['descripcion'] }}</a>
 
-                                @if ($equipo->numero_serie)
+                                @if ($equipo['numero_serie'])
                                     <span class="block truncate text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">
-                                        {{ $equipo->numero_serie }}
+                                        {{ $equipo['numero_serie'] }}
                                     </span>
                                 @endif
                             </td>
 
                             <td class="max-w-48 truncate px-5 py-2 text-zinc-600 dark:text-zinc-300">
-                                {{ $equipo->empresa ?? '—' }}
+                                {{ $equipo['empresa'] ?? '—' }}
                             </td>
 
                             <td class="max-w-40 truncate px-5 py-2 text-zinc-600 dark:text-zinc-300">
-                                {{ $equipo->area ?? '—' }}
+                                {{ $equipo['area'] ?? '—' }}
                             </td>
 
                             <td class="px-5 py-2 text-right text-[14px] font-bold tabular-nums text-carbon dark:text-white">
-                                {{ $equipo->correctivos }}
+                                {{ $equipo['correctivos'] }}
                             </td>
                         </tr>
                     @endforeach

@@ -116,6 +116,15 @@ new #[Title('Mantenimientos')] class extends Component {
 
     public string $observaciones = '';
 
+    /**
+     * El técnico encontró algo durante la rutina. Es lo que dispara el
+     * seguimiento en el panel: sin esta marca el hallazgo se pierde dentro de
+     * las observaciones y nadie abre el correctivo.
+     */
+    public bool $presenta_novedad = false;
+
+    public string $novedad = '';
+
     public string $costo = '';
 
     /** @var array<string, bool> */
@@ -514,6 +523,9 @@ new #[Title('Mantenimientos')] class extends Component {
             $this->{$campo} = (string) ($mantenimiento->{$campo} ?? '');
         }
 
+        $this->presenta_novedad = (bool) $mantenimiento->presenta_novedad;
+        $this->novedad = (string) ($mantenimiento->novedad ?? '');
+
         $this->fecha_programada = $mantenimiento->fecha_programada->format('Y-m-d');
         $this->fecha_ejecucion = $mantenimiento->fecha_ejecucion?->format('Y-m-d') ?? '';
         $this->costo = $mantenimiento->costo !== null ? (string) $mantenimiento->costo : '';
@@ -557,6 +569,12 @@ new #[Title('Mantenimientos')] class extends Component {
             'costo' => $this->costo !== '' ? (float) $this->costo : null,
             // La rutina de subtareas sólo tiene sentido en el preventivo.
             'subtareas' => $this->tipo === 'preventivo' ? $this->subtareas : null,
+            // La novedad es un hallazgo de la rutina preventiva: en un
+            // correctivo el problema ya es la orden misma.
+            'presenta_novedad' => $this->tipo === 'preventivo' && $this->presenta_novedad,
+            'novedad' => $this->tipo === 'preventivo' && $this->presenta_novedad
+                ? (trim($this->novedad) ?: null)
+                : null,
             'accesorios_estado' => array_filter(
                 $this->accesorios_estado,
                 static fn (string $estado): bool => $estado !== '',
@@ -787,6 +805,7 @@ new #[Title('Mantenimientos')] class extends Component {
             'mantenimientoId', 'equipo_id', 'buscarEquipo', 'tipo', 'estado', 'prioridad',
             'fecha_programada', 'fecha_ejecucion', 'tecnico', 'motivo',
             'descripcion', 'repuestos', 'observaciones', 'costo',
+            'presenta_novedad', 'novedad',
         ]);
 
         $this->fecha_programada = Date::today()->format('Y-m-d');
@@ -814,6 +833,10 @@ new #[Title('Mantenimientos')] class extends Component {
             'descripcion' => ['nullable', 'string', 'max:2000'],
             'repuestos' => ['nullable', 'string', 'max:2000'],
             'observaciones' => ['nullable', 'string', 'max:2000'],
+            'presenta_novedad' => ['boolean'],
+            // Marcar la novedad sin describirla deja al siguiente técnico sin
+            // saber qué buscar, así que el texto se vuelve obligatorio.
+            'novedad' => [$this->presenta_novedad ? 'required' : 'nullable', 'string', 'max:2000'],
             'costo' => ['nullable', 'numeric', 'min:0'],
             'subtareas' => ['array'],
             'subtareas.*' => ['boolean'],
@@ -836,6 +859,7 @@ new #[Title('Mantenimientos')] class extends Component {
             'descripcion' => 'trabajo a realizar',
             'repuestos' => 'repuestos utilizados',
             'costo' => 'costo del servicio',
+            'novedad' => 'novedad encontrada',
         ];
     }
 }; ?>

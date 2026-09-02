@@ -4,8 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Equipo;
 use App\Models\Mantenimiento;
-use Illuminate\Database\Seeder;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Date;
 
 /**
@@ -32,7 +32,7 @@ class PanelDemoSeeder extends Seeder
         $equipos = Equipo::query()->orderBy('id')->get();
 
         if ($equipos->isEmpty()) {
-            $this->command?->warn('Sin equipos en el inventario: no hay sobre qué generar órdenes.');
+            $this->command->warn('Sin equipos en el inventario: no hay sobre qué generar órdenes.');
 
             return;
         }
@@ -55,7 +55,7 @@ class PanelDemoSeeder extends Seeder
         $this->refrescarUltimoMantenimiento();
         $this->marcarFueraDeServicio();
 
-        $this->command?->info('Historia de doce meses generada sobre '.$equipos->count().' equipos.');
+        $this->command->info('Historia de doce meses generada sobre '.$equipos->count().' equipos.');
     }
 
     /**
@@ -215,8 +215,7 @@ class PanelDemoSeeder extends Seeder
         };
 
         if ($vence !== null) {
-            $equipo->garantia_vence = $vence;
-            $equipo->save();
+            $equipo->fill(['garantia_vence' => $vence->toDateString()])->save();
         }
     }
 
@@ -226,15 +225,14 @@ class PanelDemoSeeder extends Seeder
      */
     private function marcarFueraDeServicio(): void
     {
-        $parados = Equipo::query()
-            ->whereHas('mantenimientos', fn ($orden) => $orden
-                ->where('tipo', 'correctivo')
-                ->where('prioridad', 'Alta')
-                ->abiertos()
-            )
-            ->orderBy('id')
+        $parados = Mantenimiento::query()
+            ->abiertos()
+            ->where('tipo', 'correctivo')
+            ->where('prioridad', 'Alta')
+            ->distinct()
+            ->orderBy('equipo_id')
             ->limit(6)
-            ->pluck('id');
+            ->pluck('equipo_id');
 
         Equipo::query()->whereIn('id', $parados)->update(['estado_operativo' => 'fuera_servicio']);
     }

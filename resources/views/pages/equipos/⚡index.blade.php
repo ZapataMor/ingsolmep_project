@@ -185,6 +185,9 @@ new #[Title('Equipos')] class extends Component {
 
     public bool $activo = true;
 
+    /** Si el equipo está prestando servicio; distinto de seguir en inventario. */
+    public string $estado_operativo = 'operativo';
+
     public $foto = null;
 
     public ?string $fotoActual = null;
@@ -249,9 +252,12 @@ new #[Title('Equipos')] class extends Component {
             'descripcion' => 'Equipos operativos y disponibles para uso clínico.',
             'icono' => 'check-badge',
         ],
+        // Esta tarjeta cuenta las bajas del inventario, que es lo que dice
+        // `activo`. No debe llamarse «fuera de servicio»: eso lo responde ahora
+        // `estado_operativo`, y el panel principal lo cuenta aparte.
         'fueraDeServicio' => [
-            'titulo' => 'Equipos fuera de servicio',
-            'descripcion' => 'Equipos dados de baja temporal o pendientes de intervención.',
+            'titulo' => 'Equipos dados de baja',
+            'descripcion' => 'Equipos retirados del inventario, conservados por su historial.',
             'icono' => 'bolt-slash',
         ],
         'sinAsignar' => [
@@ -607,6 +613,7 @@ new #[Title('Equipos')] class extends Component {
         $this->ultimo_mantenimiento = $equipo->ultimo_mantenimiento?->format('Y-m-d') ?? '';
 
         $this->activo = (bool) $equipo->activo;
+        $this->estado_operativo = $equipo->estado_operativo ?: 'operativo';
         $this->suministro_electrico = $equipo->suministro_electrico ?: 'ac';
         $this->subtareas = array_merge($this->subtareas, array_map(
             static fn ($valor): bool => (bool) $valor,
@@ -716,6 +723,7 @@ new #[Title('Equipos')] class extends Component {
             'marca_id' => $marca->id,
             'modelo_id' => $modelo->id,
             'activo' => $this->activo,
+            'estado_operativo' => $this->estado_operativo,
             'suministro_electrico' => $this->suministro_electrico,
             'subtareas' => $this->subtareas,
             'accesorios_estado' => array_filter($this->accesorios_estado, static fn (string $estado): bool => $estado !== ''),
@@ -866,7 +874,7 @@ new #[Title('Equipos')] class extends Component {
             'clasificacion_especialidad', 'fabricante', 'pais_origen', 'telefono_fabricante',
             'tipo_adquisicion', 'garantia_vence', 'prioridad', 'observaciones_tecnicas',
             'observaciones_generales', 'areaNueva', 'marcaNueva', 'modeloNuevo',
-            'mantenimiento', 'ultimo_mantenimiento', 'activo', 'foto', 'fotoActual', 'suministro_electrico',
+            'mantenimiento', 'ultimo_mantenimiento', 'activo', 'estado_operativo', 'foto', 'fotoActual', 'suministro_electrico',
             'voltaje', 'amperaje', 'frecuencia', 'corriente', 'potencia', 'voltios',
             'temperatura', 'presion', 'peso', 'velocidad', 'tecnologia_predominante',
             'componentes', 'observaciones_ot', 'paso', 'pasoMaximo',
@@ -902,6 +910,7 @@ new #[Title('Equipos')] class extends Component {
                 'observaciones_tecnicas' => ['required', 'string', 'max:2000'],
                 'observaciones_generales' => ['nullable', 'string', 'max:2000'],
                 'foto' => ['nullable', 'image', 'max:2048'],
+                'estado_operativo' => [Rule::in(array_keys(Equipo::ESTADOS_OPERATIVOS))],
             ],
             2 => [
                 'suministro_electrico' => ['required', Rule::in(array_keys(Equipo::SUMINISTROS))],
@@ -987,7 +996,7 @@ new #[Title('Equipos')] class extends Component {
         $tarjetas = [
             ['tipo' => 'total', 'etiqueta' => 'Equipos registrados', 'valor' => $this->resumen['total'], 'color' => 'text-signal'],
             ['tipo' => 'activos', 'etiqueta' => 'En servicio', 'valor' => $this->resumen['activos'], 'color' => 'text-lima-700 dark:text-lima'],
-            ['tipo' => 'fueraDeServicio', 'etiqueta' => 'Fuera de servicio', 'valor' => $this->resumen['fueraDeServicio'], 'color' => 'text-rose-600 dark:text-rose-400'],
+            ['tipo' => 'fueraDeServicio', 'etiqueta' => 'Dados de baja', 'valor' => $this->resumen['fueraDeServicio'], 'color' => 'text-rose-600 dark:text-rose-400'],
             ['tipo' => 'sinAsignar', 'etiqueta' => 'Sin asignar', 'valor' => $this->resumen['sinAsignar'], 'color' => 'text-amber-600 dark:text-amber-500'],
         ];
     @endphp

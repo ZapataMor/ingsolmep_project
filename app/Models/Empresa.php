@@ -64,12 +64,18 @@ class Empresa extends Model
      */
     public function scopeCronogramaSinIniciar(Builder $consulta, CarbonInterface $mes): void
     {
+        // Se cruza contra `mantenimientos.empresa_id`, que está denormalizado
+        // justo para esto, en lugar de dos EXISTS correlacionados.
+        $delMes = fn (): Builder => Mantenimiento::query()
+            ->programadosEnElMes($mes)
+            ->whereNotNull('empresa_id');
+
         $consulta
-            ->whereHas('mantenimientos', fn (Builder $orden) => $orden->programadosEnElMes($mes))
-            ->whereDoesntHave('mantenimientos', fn (Builder $orden) => $orden
-                ->programadosEnElMes($mes)
-                ->where('estado', 'ejecutado')
-            );
+            ->whereIn('id', $delMes()->select('empresa_id'))
+            // El `whereNotNull` de arriba no es cosmético: un NULL dentro de un
+            // `NOT IN` deja la comparación indefinida y la consulta no
+            // devolvería ninguna fila.
+            ->whereNotIn('id', $delMes()->where('estado', 'ejecutado')->select('empresa_id'));
     }
 
     /**

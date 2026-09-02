@@ -1,393 +1,491 @@
 <?php
 
+namespace Tests\Feature;
+
 use App\Models\Area;
 use App\Models\Empresa;
 use App\Models\Equipo;
 use App\Models\Mantenimiento;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
+use Tests\TestCase;
 
 /**
- * Alta un usuario autenticado, que es la condición de toda la pantalla.
- */
-function usuario(): User
-{
-    $usuario = User::factory()->create();
-    test()->actingAs($usuario);
-
-    return $usuario;
-}
-
-/**
- * Equipo mínimo con los tres datos que el panel exige para no considerarlo
- * incompleto, para que sólo salgan en la bandeja los casos que cada prueba
- * prepara a propósito.
+ * El panel principal.
  *
- * @param  array<string, mixed>  $atributos
+ * Lo que se comprueba aquí, sobre todo, es la promesa que sostiene la pantalla:
+ * cada cifra coincide con el listado al que enlaza. Por eso varias pruebas
+ * cuentan dos veces la misma situación, una desde el panel y otra desde el
+ * listado, y exigen el mismo número.
  */
-function equipoCompleto(Empresa $empresa, array $atributos = []): Equipo
+class PanelTest extends TestCase
 {
-    $area = Area::create(['empresa_id' => $empresa->id, 'nombre' => 'Urgencias']);
+    use RefreshDatabase;
 
-    return Equipo::create(array_merge([
-        'empresa_id' => $empresa->id,
-        'area_id' => $area->id,
-        'descripcion' => 'Monitor de signos vitales',
-        'numero_serie' => 'SN-'.fake()->unique()->numerify('######'),
-        'registro_invima' => 'INVIMA-'.fake()->unique()->numerify('#####'),
-        'ultimo_mantenimiento' => Date::today()->subDays(10),
-    ], $atributos));
-}
+    protected function setUp(): void
+    {
+        parent::setUp();
 
-function empresa(): Empresa
-{
-    return Empresa::create(['nombre' => 'Clínica '.fake()->unique()->word()]);
-}
-
-beforeEach(function () {
-    Cache::flush();
-});
-
-// ---------------------------------------------------------------------------
-// Acceso
-// ---------------------------------------------------------------------------
-
-test('el panel exige haber iniciado sesión', function () {
-    $this->get(route('panel'))->assertRedirect(route('login'));
-});
-
-test('el panel es la pantalla de aterrizaje del usuario autenticado', function () {
-    usuario();
-
-    $this->get(route('panel'))->assertOk();
-});
-
-// ---------------------------------------------------------------------------
-// Indicadores principales
-// ---------------------------------------------------------------------------
-
-test('el cumplimiento del mes muestra su fracción, su meta y el mes anterior', function () {
-    usuario();
-    $equipo = equipoCompleto(empresa());
-    $hoy = Date::today();
-
-    // Mes en curso: tres programadas, dos ejecutadas.
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $hoy->startOfMonth(), 'fecha_ejecucion' => $hoy->startOfMonth()]);
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $hoy->startOfMonth()->addDay(), 'fecha_ejecucion' => $hoy->startOfMonth()->addDay()]);
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $hoy->endOfMonth()]);
-
-    // Mes anterior: dos programadas, una ejecutada.
-    $anterior = $hoy->subMonth()->startOfMonth();
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $anterior, 'fecha_ejecucion' => $anterior]);
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $anterior->addDay()]);
-
-    $cronograma = Livewire::test('pages::panel.index')->instance()->cronograma;
-
-    expect($cronograma['programadas'])->toBe(3)
-        ->and($cronograma['ejecutadas'])->toBe(2)
-        ->and($cronograma['porcentaje'])->toBe(67)
-        ->and($cronograma['porcentajeAnterior'])->toBe(50)
-        ->and($cronograma['variacionEjecutadas'])->toBe(100);
-});
-
-test('las órdenes vencidas cuentan lo mismo que su listado enlazado', function () {
-    usuario();
-    $equipo = equipoCompleto(empresa());
-    $hoy = Date::today();
-
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $hoy->subDays(5)]);
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'en_proceso', 'fecha_programada' => $hoy->subDays(3)]);
-    // Ni la futura ni la ya ejecutada están vencidas.
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $hoy->addDays(5)]);
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $hoy->subDays(9), 'fecha_ejecucion' => $hoy->subDays(9)]);
-
-    expect(Livewire::test('pages::panel.index')->instance()->vencidas)->toBe(2);
-
-    // La misma cifra que devuelve el listado al que enlaza el indicador.
-    $listado = Livewire::test('pages::mantenimientos.index')->set('soloVencidos', true);
-
-    expect($listado->instance()->mantenimientos->total())->toBe(2);
-});
-
-test('los equipos fuera de servicio no incluyen los dados de baja', function () {
-    usuario();
-    $empresa = empresa();
-
-    equipoCompleto($empresa, ['estado_operativo' => 'fuera_servicio']);
-    equipoCompleto($empresa, ['estado_operativo' => 'dado_baja']);
-    equipoCompleto($empresa, ['estado_operativo' => 'operativo']);
-
-    expect(Livewire::test('pages::panel.index')->instance()->fueraDeServicio)->toBe(1);
-});
-
-// ---------------------------------------------------------------------------
-// Bandeja de atención
-// ---------------------------------------------------------------------------
-
-test('los grupos vacíos de la bandeja no se renderizan', function () {
-    usuario();
-    equipoCompleto(empresa());
-
-    $bandeja = Livewire::test('pages::panel.index')->instance()->bandeja;
-
-    expect($bandeja)->toBe([]);
-});
-
-test('una novedad sin correctivo posterior aparece en la bandeja', function () {
-    usuario();
-    $equipo = equipoCompleto(empresa());
-    $hoy = Date::today();
-
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id,
-        'tipo' => 'preventivo',
-        'estado' => 'ejecutado',
-        'fecha_programada' => $hoy->subDays(30),
-        'fecha_ejecucion' => $hoy->subDays(30),
-        'presenta_novedad' => true,
-        'novedad' => 'Batería agotada.',
-    ]);
-
-    $grupo = collect(Livewire::test('pages::panel.index')->instance()->bandeja)
-        ->firstWhere('clave', 'novedad');
-
-    expect($grupo)->not->toBeNull()
-        ->and($grupo['conteo'])->toBe(1);
-
-    // El listado enlazado devuelve exactamente ese equipo.
-    $listado = Livewire::test('pages::equipos.index')->set('filtroBandeja', 'novedad');
-
-    expect($listado->instance()->equipos->total())->toBe(1);
-});
-
-test('un correctivo posterior a la novedad cierra el hueco', function () {
-    usuario();
-    $equipo = equipoCompleto(empresa());
-    $hoy = Date::today();
-
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'ejecutado',
-        'fecha_programada' => $hoy->subDays(30), 'fecha_ejecucion' => $hoy->subDays(30),
-        'presenta_novedad' => true,
-    ]);
-
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'programado',
-        'fecha_programada' => $hoy->subDays(20),
-    ]);
-
-    expect(Equipo::query()->conNovedadPendiente()->count())->toBe(0);
-});
-
-test('un correctivo cancelado no cuenta como seguimiento de la novedad', function () {
-    usuario();
-    $equipo = equipoCompleto(empresa());
-    $hoy = Date::today();
-
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'ejecutado',
-        'fecha_programada' => $hoy->subDays(30), 'fecha_ejecucion' => $hoy->subDays(30),
-        'presenta_novedad' => true,
-    ]);
-
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'cancelado',
-        'fecha_programada' => $hoy->subDays(20),
-    ]);
-
-    expect(Equipo::query()->conNovedadPendiente()->count())->toBe(1);
-});
-
-test('un correctivo anterior a la novedad no cuenta como seguimiento', function () {
-    usuario();
-    $equipo = equipoCompleto(empresa());
-    $hoy = Date::today();
-
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'ejecutado',
-        'fecha_programada' => $hoy->subDays(60), 'fecha_ejecucion' => $hoy->subDays(60),
-    ]);
-
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id, 'tipo' => 'preventivo', 'estado' => 'ejecutado',
-        'fecha_programada' => $hoy->subDays(30), 'fecha_ejecucion' => $hoy->subDays(30),
-        'presenta_novedad' => true,
-    ]);
-
-    expect(Equipo::query()->conNovedadPendiente()->count())->toBe(1);
-});
-
-test('los correctivos estancados cuentan lo mismo que su listado enlazado', function () {
-    usuario();
-    $equipo = equipoCompleto(empresa());
-    $hoy = Date::today();
-
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'programado', 'fecha_programada' => $hoy->subDays(20)]);
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'en_proceso', 'fecha_programada' => $hoy->subDays(40)]);
-    // Dentro del plazo, y una ya cerrada: ninguna de las dos está estancada.
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'programado', 'fecha_programada' => $hoy->subDays(5)]);
-    Mantenimiento::create(['equipo_id' => $equipo->id, 'tipo' => 'correctivo', 'estado' => 'ejecutado', 'fecha_programada' => $hoy->subDays(50), 'fecha_ejecucion' => $hoy->subDays(48)]);
-
-    $grupo = collect(Livewire::test('pages::panel.index')->instance()->bandeja)
-        ->firstWhere('clave', 'estancados');
-
-    expect($grupo['conteo'])->toBe(2);
-
-    $listado = Livewire::test('pages::mantenimientos.index')->set('filtroBandeja', 'estancados');
-
-    expect($listado->instance()->mantenimientos->total())->toBe(2);
-});
-
-test('las garantías por vencer excluyen las ya vencidas', function () {
-    usuario();
-    $empresa = empresa();
-    $hoy = Date::today();
-
-    equipoCompleto($empresa, ['garantia_vence' => $hoy->addDays(30)]);
-    equipoCompleto($empresa, ['garantia_vence' => $hoy->addDays(90)]);
-    equipoCompleto($empresa, ['garantia_vence' => $hoy->subDays(5)]);
-
-    $grupo = collect(Livewire::test('pages::panel.index')->instance()->bandeja)
-        ->firstWhere('clave', 'garantia');
-
-    expect($grupo['conteo'])->toBe(1);
-});
-
-test('los equipos sin mantenimiento incluyen los que nunca han tenido uno', function () {
-    usuario();
-    $empresa = empresa();
-    $hoy = Date::today();
-
-    equipoCompleto($empresa, ['ultimo_mantenimiento' => $hoy->subDays(200)]);
-    equipoCompleto($empresa, ['ultimo_mantenimiento' => null]);
-    equipoCompleto($empresa, ['ultimo_mantenimiento' => $hoy->subDays(30)]);
-
-    $grupo = collect(Livewire::test('pages::panel.index')->instance()->bandeja)
-        ->firstWhere('clave', 'sin_mantenimiento');
-
-    expect($grupo['conteo'])->toBe(2);
-});
-
-test('los datos incompletos detectan tanto el nulo como la cadena vacía', function () {
-    usuario();
-    $empresa = empresa();
-
-    equipoCompleto($empresa, ['numero_serie' => null]);
-    equipoCompleto($empresa, ['registro_invima' => '']);
-    equipoCompleto($empresa, ['area_id' => null]);
-    equipoCompleto($empresa);
-
-    $grupo = collect(Livewire::test('pages::panel.index')->instance()->bandeja)
-        ->firstWhere('clave', 'incompletos');
-
-    expect($grupo['conteo'])->toBe(3);
-
-    $listado = Livewire::test('pages::equipos.index')->set('filtroBandeja', 'incompletos');
-
-    expect($listado->instance()->equipos->total())->toBe(3);
-});
-
-test('el cronograma sin iniciar sólo aparece después del día 15', function () {
-    usuario();
-    $empresa = empresa();
-    $equipo = equipoCompleto($empresa);
-
-    $claves = function () {
+        // El panel cachea cada bloque; sin vaciar, una prueba leería las cifras
+        // que dejó la anterior.
         Cache::flush();
 
-        return collect(Livewire::test('pages::panel.index')->instance()->bandeja)->pluck('clave');
-    };
+        $this->actingAs(User::factory()->create());
+    }
 
-    Date::setTestNow(Date::parse('2026-03-10'));
+    protected function tearDown(): void
+    {
+        Date::setTestNow();
 
-    Mantenimiento::create([
-        'equipo_id' => $equipo->id, 'empresa_id' => $empresa->id,
-        'tipo' => 'preventivo', 'estado' => 'programado',
-        'fecha_programada' => '2026-03-20',
-    ]);
+        parent::tearDown();
+    }
 
-    expect($claves())->not->toContain('cronograma');
+    // ------------------------------------------------------------------
+    // Apoyos
+    // ------------------------------------------------------------------
 
-    Date::setTestNow(Date::parse('2026-03-16'));
+    private function empresa(string $nombre = 'Clínica de prueba'): Empresa
+    {
+        return Empresa::create(['nombre' => $nombre]);
+    }
 
-    expect($claves())->toContain('cronograma');
+    /**
+     * Equipo con los tres datos que el panel exige para no considerarlo
+     * incompleto, de modo que en la bandeja sólo aparezca lo que cada prueba
+     * prepara a propósito.
+     *
+     * @param  array<string, mixed>  $atributos
+     */
+    private function equipo(Empresa $empresa, array $atributos = []): Equipo
+    {
+        static $consecutivo = 0;
+        $consecutivo++;
 
-    Date::setTestNow();
-});
+        $area = Area::firstOrCreate(['empresa_id' => $empresa->id, 'nombre' => 'Urgencias']);
 
-// ---------------------------------------------------------------------------
-// Carga diferida y presupuesto de consultas
-// ---------------------------------------------------------------------------
+        return Equipo::create(array_merge([
+            'empresa_id' => $empresa->id,
+            'area_id' => $area->id,
+            'descripcion' => 'Monitor de signos vitales',
+            'numero_serie' => 'SN-'.str_pad((string) $consecutivo, 5, '0', STR_PAD_LEFT),
+            'registro_invima' => 'INVIMA-'.$consecutivo,
+            'ultimo_mantenimiento' => Date::today()->subDays(10),
+        ], $atributos));
+    }
 
-test('las gráficas y la tabla no se calculan hasta que se piden', function () {
-    usuario();
-    equipoCompleto(empresa());
+    /**
+     * @param  array<string, mixed>  $atributos
+     */
+    private function orden(Equipo $equipo, array $atributos): Mantenimiento
+    {
+        return Mantenimiento::create(array_merge([
+            'equipo_id' => $equipo->id,
+            'empresa_id' => $equipo->empresa_id,
+        ], $atributos));
+    }
 
-    $componente = Livewire::test('pages::panel.index');
+    /** @return array<string, mixed>|null */
+    private function grupoDeBandeja(string $clave): ?array
+    {
+        foreach (Livewire::test('pages::panel.index')->instance()->bandeja as $grupo) {
+            if ($grupo['clave'] === $clave) {
+                return $grupo;
+            }
+        }
 
-    expect($componente->get('analisisPedido'))->toBeFalse();
+        return null;
+    }
 
-    $componente->call('cargarAnalisis');
+    // ------------------------------------------------------------------
+    // Acceso
+    // ------------------------------------------------------------------
 
-    expect($componente->get('analisisPedido'))->toBeTrue()
-        ->and($componente->instance()->ordenesPorMes)->toHaveCount(12);
-});
+    public function test_el_panel_exige_haber_iniciado_sesion(): void
+    {
+        auth()->logout();
 
-test('la pantalla completa no supera las quince consultas', function () {
-    usuario();
-    $empresa = empresa();
-    $hoy = Date::today();
+        $this->get(route('panel'))->assertRedirect(route('login'));
+    }
 
-    foreach (range(1, 5) as $numero) {
-        $equipo = equipoCompleto($empresa);
+    public function test_el_panel_es_la_pantalla_de_aterrizaje(): void
+    {
+        $this->get(route('panel'))->assertOk();
+    }
 
-        Mantenimiento::create([
-            'equipo_id' => $equipo->id, 'empresa_id' => $empresa->id,
+    // ------------------------------------------------------------------
+    // Indicadores principales
+    // ------------------------------------------------------------------
+
+    public function test_el_cumplimiento_muestra_su_fraccion_y_el_mes_anterior(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hoy = Date::today();
+        $mes = $hoy->startOfMonth();
+        $anterior = $hoy->subMonth()->startOfMonth();
+
+        // Mes en curso: tres programadas, dos ejecutadas.
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $mes, 'fecha_ejecucion' => $mes]);
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $mes->addDay(), 'fecha_ejecucion' => $mes->addDay()]);
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $hoy->endOfMonth()]);
+
+        // Mes anterior: dos programadas, una ejecutada.
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $anterior, 'fecha_ejecucion' => $anterior]);
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $anterior->addDay()]);
+
+        $cronograma = Livewire::test('pages::panel.index')->instance()->cronograma;
+
+        $this->assertSame(3, $cronograma['programadas']);
+        $this->assertSame(2, $cronograma['ejecutadas']);
+        $this->assertSame(67, $cronograma['porcentaje']);
+        $this->assertSame(50, $cronograma['porcentajeAnterior']);
+        $this->assertSame(100, $cronograma['variacionEjecutadas']);
+    }
+
+    public function test_las_ordenes_vencidas_coinciden_con_su_listado_enlazado(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hoy = Date::today();
+
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $hoy->subDays(5)]);
+        $this->orden($equipo, ['tipo' => 'correctivo', 'estado' => 'en_proceso', 'fecha_programada' => $hoy->subDays(3)]);
+        // Ni la futura ni la ya ejecutada están vencidas.
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => $hoy->addDays(5)]);
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => $hoy->subDays(9), 'fecha_ejecucion' => $hoy->subDays(9)]);
+
+        $vencidas = Livewire::test('pages::panel.index')->instance()->vencidas;
+
+        $this->assertSame(2, $vencidas['total']);
+        // El retraso se lee en días cumplidos, en positivo.
+        $this->assertSame(5, $vencidas['diasDeLaMasAntigua']);
+
+        $listado = Livewire::test('pages::mantenimientos.index')->set('soloVencidos', true);
+
+        $this->assertSame(2, $listado->instance()->mantenimientos->total());
+    }
+
+    public function test_los_equipos_fuera_de_servicio_no_incluyen_los_dados_de_baja(): void
+    {
+        $empresa = $this->empresa();
+
+        $this->equipo($empresa, ['estado_operativo' => 'fuera_servicio']);
+        $this->equipo($empresa, ['estado_operativo' => 'dado_baja']);
+        $this->equipo($empresa, ['estado_operativo' => 'operativo']);
+
+        $this->assertSame(1, Livewire::test('pages::panel.index')->instance()->fueraDeServicio['total']);
+
+        $listado = Livewire::test('pages::equipos.index')->set('filtroBandeja', 'fuera_servicio');
+
+        $this->assertSame(1, $listado->instance()->equipos->total());
+    }
+
+    // ------------------------------------------------------------------
+    // Bandeja de atención
+    // ------------------------------------------------------------------
+
+    public function test_los_grupos_vacios_de_la_bandeja_no_se_renderizan(): void
+    {
+        $this->equipo($this->empresa());
+
+        $this->assertSame([], Livewire::test('pages::panel.index')->instance()->bandeja);
+    }
+
+    public function test_una_novedad_sin_correctivo_posterior_aparece_en_la_bandeja(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hace30 = Date::today()->subDays(30);
+
+        $this->orden($equipo, [
             'tipo' => 'preventivo', 'estado' => 'ejecutado',
-            'fecha_programada' => $hoy->subDays($numero), 'fecha_ejecucion' => $hoy->subDays($numero),
+            'fecha_programada' => $hace30, 'fecha_ejecucion' => $hace30,
+            'presenta_novedad' => true, 'novedad' => 'Batería agotada.',
         ]);
+
+        $grupo = $this->grupoDeBandeja('novedad');
+
+        $this->assertNotNull($grupo);
+        $this->assertSame(1, $grupo['conteo']);
+
+        $listado = Livewire::test('pages::equipos.index')->set('filtroBandeja', 'novedad');
+
+        $this->assertSame(1, $listado->instance()->equipos->total());
     }
 
-    Cache::flush();
+    public function test_un_correctivo_posterior_a_la_novedad_cierra_el_hueco(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hoy = Date::today();
 
-    $consultas = 0;
-    DB::listen(function () use (&$consultas) {
-        $consultas++;
-    });
+        $this->orden($equipo, [
+            'tipo' => 'preventivo', 'estado' => 'ejecutado',
+            'fecha_programada' => $hoy->subDays(30), 'fecha_ejecucion' => $hoy->subDays(30),
+            'presenta_novedad' => true,
+        ]);
 
-    // El primer pintado más la carga diferida: la pantalla completa.
-    Livewire::test('pages::panel.index')->call('cargarAnalisis');
+        $this->orden($equipo, ['tipo' => 'correctivo', 'estado' => 'programado', 'fecha_programada' => $hoy->subDays(20)]);
 
-    expect($consultas)->toBeLessThanOrEqual(15);
-});
-
-// ---------------------------------------------------------------------------
-// Enlaces
-// ---------------------------------------------------------------------------
-
-test('cada fila de la bandeja enlaza a un listado con el filtro aplicado', function () {
-    usuario();
-    $empresa = empresa();
-    $hoy = Date::today();
-
-    equipoCompleto($empresa, ['numero_serie' => null, 'garantia_vence' => $hoy->addDays(20)]);
-
-    foreach (Livewire::test('pages::panel.index')->instance()->bandeja as $grupo) {
-        expect($grupo['url'])->toContain('bandeja=');
+        $this->assertSame(0, Equipo::query()->conNovedadPendiente()->count());
     }
-});
 
-test('los filtros del listado viajan en la url', function () {
-    usuario();
+    public function test_un_correctivo_cancelado_no_cuenta_como_seguimiento(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hoy = Date::today();
 
-    Livewire::withQueryParams(['bandeja' => 'incompletos'])
-        ->test('pages::equipos.index')
-        ->assertSet('filtroBandeja', 'incompletos');
+        $this->orden($equipo, [
+            'tipo' => 'preventivo', 'estado' => 'ejecutado',
+            'fecha_programada' => $hoy->subDays(30), 'fecha_ejecucion' => $hoy->subDays(30),
+            'presenta_novedad' => true,
+        ]);
 
-    Livewire::withQueryParams(['vencidos' => true])
-        ->test('pages::mantenimientos.index')
-        ->assertSet('soloVencidos', true);
-});
+        $this->orden($equipo, ['tipo' => 'correctivo', 'estado' => 'cancelado', 'fecha_programada' => $hoy->subDays(20)]);
+
+        $this->assertSame(1, Equipo::query()->conNovedadPendiente()->count());
+    }
+
+    public function test_un_correctivo_anterior_a_la_novedad_no_cuenta_como_seguimiento(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hoy = Date::today();
+
+        $this->orden($equipo, [
+            'tipo' => 'correctivo', 'estado' => 'ejecutado',
+            'fecha_programada' => $hoy->subDays(60), 'fecha_ejecucion' => $hoy->subDays(60),
+        ]);
+
+        $this->orden($equipo, [
+            'tipo' => 'preventivo', 'estado' => 'ejecutado',
+            'fecha_programada' => $hoy->subDays(30), 'fecha_ejecucion' => $hoy->subDays(30),
+            'presenta_novedad' => true,
+        ]);
+
+        $this->assertSame(1, Equipo::query()->conNovedadPendiente()->count());
+    }
+
+    public function test_los_correctivos_estancados_coinciden_con_su_listado_enlazado(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hoy = Date::today();
+
+        $this->orden($equipo, ['tipo' => 'correctivo', 'estado' => 'programado', 'fecha_programada' => $hoy->subDays(20)]);
+        $this->orden($equipo, ['tipo' => 'correctivo', 'estado' => 'en_proceso', 'fecha_programada' => $hoy->subDays(40)]);
+        // Dentro del plazo, y una ya cerrada: ninguna de las dos está estancada.
+        $this->orden($equipo, ['tipo' => 'correctivo', 'estado' => 'programado', 'fecha_programada' => $hoy->subDays(5)]);
+        $this->orden($equipo, ['tipo' => 'correctivo', 'estado' => 'ejecutado', 'fecha_programada' => $hoy->subDays(50), 'fecha_ejecucion' => $hoy->subDays(48)]);
+
+        $this->assertSame(2, $this->grupoDeBandeja('estancados')['conteo']);
+
+        $listado = Livewire::test('pages::mantenimientos.index')->set('filtroBandeja', 'estancados');
+
+        $this->assertSame(2, $listado->instance()->mantenimientos->total());
+    }
+
+    public function test_las_garantias_por_vencer_excluyen_las_ya_vencidas(): void
+    {
+        $empresa = $this->empresa();
+        $hoy = Date::today();
+
+        $this->equipo($empresa, ['garantia_vence' => $hoy->addDays(30)]);
+        $this->equipo($empresa, ['garantia_vence' => $hoy->addDays(90)]);
+        $this->equipo($empresa, ['garantia_vence' => $hoy->subDays(5)]);
+
+        $this->assertSame(1, $this->grupoDeBandeja('garantia')['conteo']);
+
+        $listado = Livewire::test('pages::equipos.index')->set('filtroBandeja', 'garantia');
+
+        $this->assertSame(1, $listado->instance()->equipos->total());
+    }
+
+    public function test_los_equipos_sin_mantenimiento_incluyen_los_que_nunca_han_tenido_uno(): void
+    {
+        $empresa = $this->empresa();
+        $hoy = Date::today();
+
+        $this->equipo($empresa, ['ultimo_mantenimiento' => $hoy->subDays(200)]);
+        $this->equipo($empresa, ['ultimo_mantenimiento' => null]);
+        $this->equipo($empresa, ['ultimo_mantenimiento' => $hoy->subDays(30)]);
+
+        $this->assertSame(2, $this->grupoDeBandeja('sin_mantenimiento')['conteo']);
+    }
+
+    public function test_los_datos_incompletos_detectan_el_nulo_y_la_cadena_vacia(): void
+    {
+        $empresa = $this->empresa();
+
+        $this->equipo($empresa, ['numero_serie' => null]);
+        $this->equipo($empresa, ['registro_invima' => '']);
+        $this->equipo($empresa, ['area_id' => null]);
+        $this->equipo($empresa);
+
+        $this->assertSame(3, $this->grupoDeBandeja('incompletos')['conteo']);
+
+        $listado = Livewire::test('pages::equipos.index')->set('filtroBandeja', 'incompletos');
+
+        $this->assertSame(3, $listado->instance()->equipos->total());
+    }
+
+    public function test_el_cronograma_sin_iniciar_solo_aparece_despues_del_dia_quince(): void
+    {
+        $empresa = $this->empresa();
+        $equipo = $this->equipo($empresa);
+
+        Date::setTestNow(Date::parse('2026-03-10'));
+
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => '2026-03-20']);
+
+        Cache::flush();
+        $this->assertNull($this->grupoDeBandeja('cronograma'));
+
+        Date::setTestNow(Date::parse('2026-03-16'));
+
+        Cache::flush();
+        $grupo = $this->grupoDeBandeja('cronograma');
+
+        $this->assertNotNull($grupo);
+        $this->assertSame(1, $grupo['conteo']);
+
+        $listado = Livewire::test('pages::empresas.index')->set('filtroBandeja', 'cronograma');
+
+        $this->assertSame(1, $listado->instance()->empresas->total());
+    }
+
+    public function test_una_institucion_que_ya_ejecuto_algo_no_sale_en_el_cronograma(): void
+    {
+        Date::setTestNow(Date::parse('2026-03-16'));
+
+        $empresa = $this->empresa();
+        $equipo = $this->equipo($empresa);
+
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'programado', 'fecha_programada' => '2026-03-20']);
+        $this->orden($equipo, ['tipo' => 'preventivo', 'estado' => 'ejecutado', 'fecha_programada' => '2026-03-05', 'fecha_ejecucion' => '2026-03-05']);
+
+        Cache::flush();
+
+        $this->assertNull($this->grupoDeBandeja('cronograma'));
+    }
+
+    // ------------------------------------------------------------------
+    // Carga diferida y presupuesto de consultas
+    // ------------------------------------------------------------------
+
+    public function test_las_graficas_y_la_tabla_no_se_calculan_hasta_que_se_piden(): void
+    {
+        $this->equipo($this->empresa());
+
+        $componente = Livewire::test('pages::panel.index');
+
+        $this->assertFalse($componente->get('analisisPedido'));
+
+        $componente->call('cargarAnalisis');
+
+        $this->assertTrue($componente->get('analisisPedido'));
+        $this->assertCount(12, $componente->instance()->ordenesPorMes);
+    }
+
+    public function test_la_pantalla_completa_no_supera_las_quince_consultas(): void
+    {
+        $empresa = $this->empresa();
+        $hoy = Date::today();
+
+        foreach (range(1, 5) as $numero) {
+            $equipo = $this->equipo($empresa);
+
+            $this->orden($equipo, [
+                'tipo' => 'preventivo', 'estado' => 'ejecutado',
+                'fecha_programada' => $hoy->subDays($numero), 'fecha_ejecucion' => $hoy->subDays($numero),
+            ]);
+        }
+
+        Cache::flush();
+
+        $consultas = 0;
+        DB::listen(function () use (&$consultas): void {
+            $consultas++;
+        });
+
+        // El primer pintado más la carga diferida: la pantalla completa.
+        Livewire::test('pages::panel.index')->call('cargarAnalisis');
+
+        $this->assertLessThanOrEqual(15, $consultas, "La pantalla ejecutó {$consultas} consultas.");
+    }
+
+    // ------------------------------------------------------------------
+    // Enlaces
+    // ------------------------------------------------------------------
+
+    public function test_cada_fila_de_la_bandeja_enlaza_a_un_listado_filtrado(): void
+    {
+        $empresa = $this->empresa();
+        $hoy = Date::today();
+
+        $this->equipo($empresa, ['numero_serie' => null, 'garantia_vence' => $hoy->addDays(20)]);
+        $this->equipo($empresa, ['ultimo_mantenimiento' => null]);
+
+        $bandeja = Livewire::test('pages::panel.index')->instance()->bandeja;
+
+        $this->assertNotEmpty($bandeja);
+
+        foreach ($bandeja as $grupo) {
+            $this->assertStringContainsString('bandeja=', $grupo['url'], "El grupo {$grupo['clave']} no enlaza a un listado filtrado.");
+        }
+    }
+
+    public function test_la_novedad_marcada_en_el_formulario_llega_a_la_bandeja(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+        $hoy = Date::today();
+
+        Livewire::test('pages::mantenimientos.index')
+            ->set('equipo_id', (string) $equipo->id)
+            ->set('tipo', 'preventivo')
+            ->set('estado', 'ejecutado')
+            ->set('fecha_programada', $hoy->subDays(3)->format('Y-m-d'))
+            ->set('fecha_ejecucion', $hoy->subDays(3)->format('Y-m-d'))
+            ->set('descripcion', 'Rutina preventiva trimestral.')
+            ->set('presenta_novedad', true)
+            ->set('novedad', 'Cable de alimentación agrietado.')
+            ->call('guardar')
+            ->assertHasNoErrors();
+
+        $this->assertTrue(Mantenimiento::query()->firstOrFail()->presenta_novedad);
+
+        Cache::flush();
+
+        $this->assertSame(1, $this->grupoDeBandeja('novedad')['conteo']);
+    }
+
+    public function test_marcar_la_novedad_obliga_a_describirla(): void
+    {
+        $equipo = $this->equipo($this->empresa());
+
+        Livewire::test('pages::mantenimientos.index')
+            ->set('equipo_id', (string) $equipo->id)
+            ->set('tipo', 'preventivo')
+            ->set('estado', 'ejecutado')
+            ->set('fecha_programada', Date::today()->format('Y-m-d'))
+            ->set('fecha_ejecucion', Date::today()->format('Y-m-d'))
+            ->set('descripcion', 'Rutina preventiva trimestral.')
+            ->set('presenta_novedad', true)
+            ->set('novedad', '')
+            ->call('guardar')
+            ->assertHasErrors('novedad');
+    }
+
+    public function test_los_filtros_del_listado_viajan_en_la_url(): void
+    {
+        Livewire::withQueryParams(['bandeja' => 'incompletos'])
+            ->test('pages::equipos.index')
+            ->assertSet('filtroBandeja', 'incompletos');
+
+        Livewire::withQueryParams(['vencidos' => true])
+            ->test('pages::mantenimientos.index')
+            ->assertSet('soloVencidos', true);
+
+        Livewire::withQueryParams(['bandeja' => 'cronograma'])
+            ->test('pages::empresas.index')
+            ->assertSet('filtroBandeja', 'cronograma');
+    }
+}

@@ -69,10 +69,8 @@ new #[Title('Panel')] class extends Component {
             $inicioActual = $this->hoy()->startOfMonth()->toDateString();
 
             $fila = Mantenimiento::query()
-                ->whereBetween('fecha_programada', [
-                    $this->hoy()->subMonth()->startOfMonth()->toDateString(),
-                    $this->hoy()->endOfMonth()->toDateString(),
-                ])
+                ->whereDate('fecha_programada', '>=', $this->hoy()->subMonth()->startOfMonth()->toDateString())
+                ->whereDate('fecha_programada', '<=', $this->hoy()->endOfMonth()->toDateString())
                 ->selectRaw(
                     'SUM(fecha_programada >= ?) as prog_actual,'
                     .' SUM(fecha_programada >= ? AND estado = ?) as ejec_actual,'
@@ -102,24 +100,63 @@ new #[Title('Panel')] class extends Component {
     }
 
     /**
-     * Órdenes pendientes cuya fecha programada ya pasó. Es lo único de la
-     * pantalla que exige actuar hoy, así que caduca mucho antes que el resto.
+     * Órdenes pendientes cuya fecha programada ya pasó, con el retraso de la
+     * más antigua: siete vencidas de ayer y siete de hace tres meses no son el
+     * mismo problema.
+     *
+     * Es lo único de la pantalla que exige actuar hoy, así que caduca mucho
+     * antes que el resto.
+     *
+     * @return array{total: int, diasDeLaMasAntigua: int}
      */
     #[Computed]
-    public function vencidas(): int
+    public function vencidas(): array
     {
         return Cache::remember(
             $this->clave('vencidas'),
             (int) config('panel.cache.segundos_vencidas', 60),
-            fn (): int => Mantenimiento::query()->vencidos()->count(),
+            function (): array {
+                $fila = Mantenimiento::query()
+                    ->vencidos()
+                    ->selectRaw('COUNT(*) as total, MIN(fecha_programada) as mas_antigua')
+                    ->first();
+
+                $masAntigua = $fila->mas_antigua ?? null;
+
+                return [
+                    'total' => (int) ($fila->total ?? 0),
+                    // La diferencia se toma desde la orden hacia hoy: al revés
+                    // Carbon la devuelve con signo negativo, que es lo que
+                    // corresponde a una fecha pasada pero no lo que se lee.
+                    'diasDeLaMasAntigua' => $masAntigua === null
+                        ? 0
+                        : (int) Date::parse($masAntigua)->startOfDay()->diffInDays($this->hoy()),
+                ];
+            },
         );
     }
 
-    /** Equipos parados: cada uno es una institución con un problema abierto. */
+    /**
+     * Equipos parados, sobre el total del inventario vigente: cada uno es una
+     * institución con un problema abierto, y la proporción dice si es un caso
+     * aislado o un patrón.
+     *
+     * @return array{total: int, vigentes: int}
+     */
     #[Computed]
-    public function fueraDeServicio(): int
+    public function fueraDeServicio(): array
     {
-        return $this->recordar('fuera_servicio', fn (): int => Equipo::query()->fueraDeServicio()->count());
+        return $this->recordar('fuera_servicio', function (): array {
+            $fila = Equipo::query()
+                ->activos()
+                ->selectRaw('COUNT(*) as vigentes, SUM(estado_operativo = ?) as parados', ['fuera_servicio'])
+                ->first();
+
+            return [
+                'total' => (int) ($fila->parados ?? 0),
+                'vigentes' => (int) ($fila->vigentes ?? 0),
+            ];
+        });
     }
 
     // ------------------------------------------------------------------
@@ -245,10 +282,8 @@ new #[Title('Panel')] class extends Component {
             $desde = $this->hoy()->startOfMonth()->subMonths(11);
 
             $filas = Mantenimiento::query()
-                ->whereBetween('fecha_programada', [
-                    $desde->toDateString(),
-                    $this->hoy()->endOfMonth()->toDateString(),
-                ])
+                ->whereDate('fecha_programada', '>=', $desde->toDateString())
+                ->whereDate('fecha_programada', '<=', $this->hoy()->endOfMonth()->toDateString())
                 // SUBSTR sobre la fecha en lugar de una función de calendario:
                 // es la forma de agrupar por mes que entienden por igual MySQL
                 // y el SQLite de las pruebas.
@@ -438,35 +473,43 @@ new #[Title('Panel')] class extends Component {
         </a>
 
         {{-- OT vencidas: el rojo más fuerte de la interfaz, y el único. --}}
+        @php $vencidas = $this->vencidas; @endphp
+
         <a
             href="{{ route('mantenimientos.index', ['vencidos' => 1]) }}"
             wire:navigate
             @class([
                 'eq-panel flex flex-col justify-between gap-3 px-5 py-4 transition duration-200',
-                'border-rose-300 bg-rose-50 hover:border-rose-400 dark:border-rose-500/40 dark:bg-rose-500/10 dark:hover:border-rose-500/60' => $this->vencidas > 0,
-                'hover:border-zinc-300 dark:hover:border-zinc-700' => $this->vencidas === 0,
+                'border-rose-300 bg-rose-50 hover:border-rose-400 dark:border-rose-500/40 dark:bg-rose-500/10 dark:hover:border-rose-500/60' => $vencidas['total'] > 0,
+                'hover:border-zinc-300 dark:hover:border-zinc-700' => $vencidas['total'] === 0,
             ])
         >
             <p @class([
                 'text-[11.5px] font-semibold tracking-wide uppercase',
-                'text-rose-700 dark:text-rose-300' => $this->vencidas > 0,
-                'text-zinc-500 dark:text-zinc-400' => $this->vencidas === 0,
+                'text-rose-700 dark:text-rose-300' => $vencidas['total'] > 0,
+                'text-zinc-500 dark:text-zinc-400' => $vencidas['total'] === 0,
             ])>
                 Órdenes vencidas
             </p>
 
             <p @class([
                 'text-4xl leading-none font-bold tabular-nums',
-                'text-rose-600 dark:text-rose-400' => $this->vencidas > 0,
-                'text-carbon dark:text-white' => $this->vencidas === 0,
-            ])>{{ $this->vencidas }}</p>
+                'text-rose-600 dark:text-rose-400' => $vencidas['total'] > 0,
+                'text-carbon dark:text-white' => $vencidas['total'] === 0,
+            ])>{{ $vencidas['total'] }}</p>
 
-            <p class="text-[12px] text-zinc-500 dark:text-zinc-400">
-                {{ $this->vencidas > 0 ? 'Pendientes con la fecha ya pasada' : 'Ninguna orden con la fecha pasada' }}
+            <p class="text-[12px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                @if ($vencidas['total'] === 0)
+                    Ninguna orden con la fecha pasada
+                @else
+                    La más antigua lleva {{ $vencidas['diasDeLaMasAntigua'] }} {{ $vencidas['diasDeLaMasAntigua'] === 1 ? 'día' : 'días' }} de retraso
+                @endif
             </p>
         </a>
 
         {{-- Equipos fuera de servicio. --}}
+        @php $parados = $this->fueraDeServicio; @endphp
+
         <a
             href="{{ route('equipos.index', ['bandeja' => 'fuera_servicio']) }}"
             wire:navigate
@@ -478,12 +521,12 @@ new #[Title('Panel')] class extends Component {
 
             <p @class([
                 'text-4xl leading-none font-bold tabular-nums',
-                'text-amber-600 dark:text-amber-500' => $this->fueraDeServicio > 0,
-                'text-carbon dark:text-white' => $this->fueraDeServicio === 0,
-            ])>{{ $this->fueraDeServicio }}</p>
+                'text-amber-600 dark:text-amber-500' => $parados['total'] > 0,
+                'text-carbon dark:text-white' => $parados['total'] === 0,
+            ])>{{ $parados['total'] }}</p>
 
-            <p class="text-[12px] text-zinc-500 dark:text-zinc-400">
-                Cada uno es un problema abierto en su institución
+            <p class="text-[12px] tabular-nums text-zinc-500 dark:text-zinc-400">
+                De {{ $parados['vigentes'] }} equipos vigentes · cada uno es un problema abierto
             </p>
         </a>
     </div>

@@ -141,10 +141,13 @@ class Mantenimiento extends Model
      */
     public function scopeProgramadosEnElMes(Builder $consulta, CarbonInterface $mes): void
     {
-        $consulta->whereBetween('fecha_programada', [
-            $mes->copy()->startOfMonth()->toDateString(),
-            $mes->copy()->endOfMonth()->toDateString(),
-        ]);
+        // La comparación va por fecha y no por el valor crudo de la columna: en
+        // SQLite el campo guarda «2026-09-30 00:00:00», que en una comparación
+        // de cadenas queda por encima de «2026-09-30» y dejaría fuera el último
+        // día de cada mes.
+        $consulta
+            ->whereDate('fecha_programada', '>=', $mes->copy()->startOfMonth()->toDateString())
+            ->whereDate('fecha_programada', '<=', $mes->copy()->endOfMonth()->toDateString());
     }
 
     /**

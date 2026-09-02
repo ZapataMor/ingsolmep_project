@@ -266,6 +266,30 @@
                                         @error('observaciones') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
                                     </div>
                                 </div>
+
+                                {{-- Novedad de la rutina preventiva. Es lo que el
+                                     panel persigue: un hallazgo anotado aquí y
+                                     sin correctivo después queda señalado en la
+                                     bandeja de atención hasta que se atienda. --}}
+                                @if (! $esCorrectivo)
+                                    <div class="mt-5">
+                                        <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 transition hover:border-lima dark:border-zinc-700 dark:bg-zinc-900">
+                                            <input type="checkbox" class="size-4 rounded accent-lima" wire:model.live="presenta_novedad">
+                                            <span class="text-sm font-medium text-carbon dark:text-zinc-200">
+                                                El equipo presenta una novedad que requiere seguimiento
+                                            </span>
+                                        </label>
+
+                                        @if ($presenta_novedad)
+                                            <div class="mt-3">
+                                                <label class="eq-label" for="mt-novedad">Novedad encontrada <span class="eq-req">*</span></label>
+                                                <textarea id="mt-novedad" class="eq-textarea" wire:model="novedad" placeholder="Ej: cable de alimentación con el aislamiento agrietado."></textarea>
+                                                <span class="eq-hint">Quedará pendiente en el panel hasta que se abra el correctivo que la atienda.</span>
+                                                @error('novedad') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
                             </div>
                         </section>
 

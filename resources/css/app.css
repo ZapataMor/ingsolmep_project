@@ -333,8 +333,10 @@ body:has(.eq-modal) {
     display: block;
 }
 
-/* Al apuntar la barra colapsada, el botón de expandir toma el lugar
-   de la marca (mismo comportamiento que `flux:sidebar.brand`). */
-[data-flux-sidebar-collapsed-desktop][data-flux-sidebar-active] .eq-brand {
-    opacity: 0;
+/* Flux intercambia marca y botón de expandir al apuntar la barra colapsada.
+   Aquí el ícono se queda fijo: sólo desaparece al abrir la barra, no al pasar
+   el puntero. El botón sigue ocupando el mismo sitio —invisible pero activo—,
+   así que hacer clic sobre el ícono expande el menú igual que antes. */
+[data-flux-sidebar-collapsed-desktop] [data-flux-sidebar-collapse] {
+    opacity: 0 !important;
 }

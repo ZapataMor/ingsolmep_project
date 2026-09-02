@@ -186,7 +186,8 @@ new #[Title('Mantenimientos')] class extends Component {
         $columna = in_array($this->ordenarPor, $ordenables, true) ? $this->ordenarPor : 'fecha_programada';
 
         return $this->consultaFiltrada()
-            ->with(['equipo.marca', 'equipo.modelo', 'equipo.area', 'empresa'])
+            // `reporte` distingue en la tabla las órdenes que ya se reportaron.
+            ->with(['equipo.marca', 'equipo.modelo', 'equipo.area', 'empresa', 'reporte'])
             ->orderBy($columna, $this->ordenDireccion === 'asc' ? 'asc' : 'desc')
             ->orderBy('id', 'desc')
             ->paginate($this->porPagina);
@@ -1092,6 +1093,29 @@ new #[Title('Mantenimientos')] class extends Component {
                                         >
                                             <flux:icon name="check-circle" variant="mini" class="size-4" />
                                         </button>
+                                    @endif
+
+                                    {{-- Una orden ejecutada ya puede reportarse; el enlace no debe
+                                         abrir además la ficha de la fila que lo contiene. --}}
+                                    @if ($mantenimiento->estado === 'ejecutado')
+                                        @php $reporteEmitido = $mantenimiento->reporte; @endphp
+
+                                        <a
+                                            x-data
+                                            x-on:click.stop
+                                            href="{{ route('mantenimientos.reporte', [$mantenimiento, 'imprimir' => 1]) }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                            @class([
+                                                'eq-icon-btn hover:!bg-lima-soft hover:!text-lima-700 dark:hover:!bg-lima/10 dark:hover:!text-lima',
+                                                '!text-lima-700 dark:!text-lima' => $reporteEmitido,
+                                            ])
+                                            title="{{ $reporteEmitido
+                                                ? 'Reporte '.$reporteEmitido->codigo().' ya generado el '.$reporteEmitido->ultima_generacion->format('d/m/Y').'; se vuelve a emitir'
+                                                : 'Generar el reporte de '.$mantenimiento->codigo() }}"
+                                        >
+                                            <flux:icon name="document-arrow-down" variant="mini" class="size-4" />
+                                        </a>
                                     @endif
 
                                     <button type="button" class="eq-icon-btn" wire:click.stop="editar({{ $mantenimiento->id }})" title="Editar {{ $mantenimiento->codigo() }}">

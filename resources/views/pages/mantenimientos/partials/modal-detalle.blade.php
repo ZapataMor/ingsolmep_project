@@ -219,6 +219,20 @@
                             </button>
                         @endif
 
+                        {{-- El reporte certifica un trabajo hecho: sólo existe con la orden ejecutada. --}}
+                        @if ($mantenimiento->estado === 'ejecutado')
+                            <a
+                                href="{{ route('mantenimientos.reporte', $mantenimiento) }}"
+                                target="_blank"
+                                rel="noopener"
+                                class="eq-btn eq-btn-accent"
+                                title="Abrir el reporte de {{ $mantenimiento->codigo() }} en una pestaña nueva"
+                            >
+                                <flux:icon name="document-arrow-down" variant="mini" class="size-4" />
+                                Generar reporte
+                            </a>
+                        @endif
+
                         <button type="button" class="eq-btn eq-btn-primary" wire:click="editar({{ $mantenimiento->id }})">
                             <flux:icon name="pencil-square" variant="mini" class="size-4" />
                             Editar orden

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
@@ -20,6 +22,8 @@ use Illuminate\Support\Facades\Date;
  * @property Carbon $fecha_programada
  * @property Carbon|null $fecha_ejecucion
  * @property string|null $tecnico
+ * @property bool $presenta_novedad
+ * @property string|null $novedad
  * @property array<string, bool>|null $subtareas
  * @property array<string, string>|null $accesorios_estado
  */
@@ -27,6 +31,7 @@ use Illuminate\Support\Facades\Date;
     'equipo_id', 'empresa_id', 'tipo', 'estado', 'prioridad',
     'fecha_programada', 'fecha_ejecucion', 'tecnico',
     'motivo', 'descripcion', 'repuestos', 'observaciones', 'costo',
+    'presenta_novedad', 'novedad',
     'subtareas', 'accesorios_estado',
 ])]
 class Mantenimiento extends Model
@@ -70,6 +75,7 @@ class Mantenimiento extends Model
             'fecha_programada' => 'date',
             'fecha_ejecucion' => 'date',
             'costo' => 'decimal:2',
+            'presenta_novedad' => 'boolean',
             'subtareas' => 'array',
             'accesorios_estado' => 'array',
         ];
@@ -85,6 +91,12 @@ class Mantenimiento extends Model
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    /** @return HasOne<Reporte, $this> */
+    public function reporte(): HasOne
+    {
+        return $this->hasOne(Reporte::class);
     }
 
     /**
@@ -105,6 +117,34 @@ class Mantenimiento extends Model
     public function scopeVencidos(Builder $consulta): void
     {
         $consulta->abiertos()->whereDate('fecha_programada', '<', Date::today());
+    }
+
+    /**
+     * Correctivos abiertos hace más de los días indicados, contados desde su
+     * fecha programada. Son las órdenes que se quedaron sin cerrar.
+     *
+     * @param  Builder<self>  $consulta
+     */
+    public function scopeEstancados(Builder $consulta, ?int $dias = null): void
+    {
+        $dias ??= (int) config('panel.umbrales.correctivo_estancado', 15);
+
+        $consulta->where('tipo', 'correctivo')
+            ->abiertos()
+            ->whereDate('fecha_programada', '<', Date::today()->subDays($dias));
+    }
+
+    /**
+     * Órdenes programadas dentro del mes al que pertenece la fecha dada.
+     *
+     * @param  Builder<self>  $consulta
+     */
+    public function scopeProgramadosEnElMes(Builder $consulta, CarbonInterface $mes): void
+    {
+        $consulta->whereBetween('fecha_programada', [
+            $mes->copy()->startOfMonth()->toDateString(),
+            $mes->copy()->endOfMonth()->toDateString(),
+        ]);
     }
 
     /**

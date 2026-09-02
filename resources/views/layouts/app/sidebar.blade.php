@@ -26,6 +26,10 @@
                 <flux:sidebar.item class="eq-navitem" icon="wrench-screwdriver" :href="route('mantenimientos.index')" :current="request()->routeIs('mantenimientos.*')" wire:navigate>
                     {{ __('Mantenimientos') }}
                 </flux:sidebar.item>
+
+                <flux:sidebar.item class="eq-navitem" icon="document-text" :href="route('reportes.index')" :current="request()->routeIs('reportes.*')" wire:navigate>
+                    {{ __('Reportes') }}
+                </flux:sidebar.item>
             </flux:sidebar.nav>
 
             <flux:spacer />

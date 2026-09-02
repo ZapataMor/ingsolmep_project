@@ -316,7 +316,7 @@ body:has(.eq-modal) {
 }
 
 .eq-brand-badge {
-    @apply hidden size-9 shrink-0 items-center justify-center rounded-lg bg-lima text-[17px] font-bold text-white;
+    @apply hidden size-9 shrink-0 object-contain;
 }
 
 [data-flux-sidebar-collapsed-desktop] .eq-brand {
@@ -330,7 +330,7 @@ body:has(.eq-modal) {
 }
 
 [data-flux-sidebar-collapsed-desktop] .eq-brand-badge {
-    display: flex;
+    display: block;
 }
 
 /* Al apuntar la barra colapsada, el botón de expandir toma el lugar

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Empresa;
+use App\Models\Equipo;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -97,6 +98,9 @@ new #[Title('Empresas')] class extends Component {
 
     public ?int $empresaVista = null;
 
+    /** Pestaña abierta en la ficha. Ver {@see self::PESTANAS_FICHA}. */
+    public string $fichaPestana = 'informacion';
+
     public string $listadoVisto = '';
 
     /**
@@ -129,6 +133,25 @@ new #[Title('Empresas')] class extends Component {
 
     /** Máximo de filas que muestra el modal de listado antes de recortar. */
     public const TOPE_LISTADO = 100;
+
+    /**
+     * Las tres preguntas que se le hacen a una institución: quién es, qué tiene
+     * y quién entra por ella. Cada una es una pestaña de la ficha.
+     *
+     * @var array<string, array{titulo: string, icono: string}>
+     */
+    public const PESTANAS_FICHA = [
+        'informacion' => ['titulo' => 'Información', 'icono' => 'building-office-2'],
+        'equipos' => ['titulo' => 'Equipos', 'icono' => 'rectangle-stack'],
+        'usuarios' => ['titulo' => 'Usuarios', 'icono' => 'users'],
+    ];
+
+    /**
+     * Máximo de equipos que lista la ficha de la empresa. La ficha resuelve
+     * «qué tiene esta institución», no reemplaza al módulo de equipos: pasado
+     * el tope se remite allí, donde hay filtros y paginación.
+     */
+    public const TOPE_EQUIPOS_FICHA = 50;
 
     /** Tamaño máximo del logo, en kilobytes. */
     public const MAX_LOGO_KB = 5120;
@@ -212,6 +235,29 @@ new #[Title('Empresas')] class extends Component {
                 'usuarios' => fn ($consulta) => $consulta->orderBy('name'),
             ])
             ->find($this->empresaVista);
+    }
+
+    /**
+     * Inventario asignado a la empresa abierta en la ficha, recortado al tope.
+     *
+     * Va aparte de `empresaDetalle` y no como relación cargada con ella para
+     * poder limitarlo sin arrastrar inventarios de cientos de equipos.
+     *
+     * @return Collection<int, Equipo>
+     */
+    #[Computed]
+    public function equiposDeLaEmpresa(): Collection
+    {
+        if ($this->empresaVista === null || $this->fichaPestana !== 'equipos') {
+            return collect();
+        }
+
+        return Equipo::query()
+            ->where('empresa_id', $this->empresaVista)
+            ->with(['area', 'marca', 'modelo'])
+            ->orderBy('descripcion')
+            ->limit(self::TOPE_EQUIPOS_FICHA)
+            ->get();
     }
 
     /** Empresa señalada para eliminar, con el conteo de lo que arrastra. */
@@ -318,6 +364,14 @@ new #[Title('Empresas')] class extends Component {
     public function verEmpresa(int $id): void
     {
         $this->empresaVista = $id;
+        $this->fichaPestana = 'informacion';
+    }
+
+    public function verPestanaFicha(string $pestana): void
+    {
+        if (array_key_exists($pestana, self::PESTANAS_FICHA)) {
+            $this->fichaPestana = $pestana;
+        }
     }
 
     public function cerrarDetalle(): void
@@ -888,7 +942,13 @@ new #[Title('Empresas')] class extends Component {
     @endteleport
 
     @teleport('body')
-        @include('pages.empresas.partials.modal-detalle', ['empresa' => $this->empresaDetalle])
+        @include('pages.empresas.partials.modal-detalle', [
+            'empresa' => $this->empresaDetalle,
+            'equipos' => $this->equiposDeLaEmpresa,
+            'topeEquipos' => $this::TOPE_EQUIPOS_FICHA,
+            'pestanas' => $this::PESTANAS_FICHA,
+            'pestanaActiva' => $this->fichaPestana,
+        ])
     @endteleport
 
     @teleport('body')

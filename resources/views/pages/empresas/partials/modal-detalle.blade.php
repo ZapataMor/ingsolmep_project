@@ -27,6 +27,15 @@
                         'Teléfono fijo' => $empresa->telefono,
                         'WhatsApp' => $empresa->whatsapp,
                     ];
+
+                    $estadosOperativos = \App\Models\Equipo::ESTADOS_OPERATIVOS;
+
+                    // Cada pestaña lleva el tamaño de lo que hay dentro, para
+                    // no obligar a entrar sólo a comprobar si está vacía.
+                    $totalesPorPestana = [
+                        'equipos' => $empresa->equipos_count,
+                        'usuarios' => $empresa->usuarios->count(),
+                    ];
                 @endphp
 
                 {{-- Cabecera --}}
@@ -69,8 +78,41 @@
                     </div>
                 </div>
 
-                {{-- Cuerpo --}}
+                {{-- Pestañas --}}
+                <div class="border-b border-zinc-200 px-6 sm:px-8 dark:border-zinc-800">
+                    <nav class="flex flex-wrap gap-x-4 sm:gap-x-6" aria-label="Secciones de la ficha">
+                        @foreach ($pestanas as $clave => $definicion)
+                            @php $activa = $clave === $pestanaActiva; @endphp
+
+                            <button
+                                type="button"
+                                wire:click="verPestanaFicha('{{ $clave }}')"
+                                aria-current="{{ $activa ? 'page' : 'false' }}"
+                                @class([
+                                    'eq-tab',
+                                    'eq-tab-activa' => $activa,
+                                    'eq-tab-inactiva' => ! $activa,
+                                ])
+                            >
+                                <flux:icon name="{{ $definicion['icono'] }}" variant="mini" @class(['size-4', 'text-lima' => $activa]) />
+                                {{ $definicion['titulo'] }}
+
+                                @isset ($totalesPorPestana[$clave])
+                                    <span @class([
+                                        'rounded-full px-1.5 py-0.5 text-[10.5px] font-bold',
+                                        'bg-lima-soft text-lima-700 dark:bg-lima/15 dark:text-lima' => $activa,
+                                        'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' => ! $activa,
+                                    ])>{{ $totalesPorPestana[$clave] }}</span>
+                                @endisset
+                            </button>
+                        @endforeach
+                    </nav>
+                </div>
+
+                {{-- Cuerpo. Sólo se pinta la pestaña abierta: el inventario
+                     además ni se consulta mientras la suya esté cerrada. --}}
                 <div class="max-h-[60vh] space-y-6 overflow-y-auto px-6 py-6 sm:px-8">
+                    @if ($pestanaActiva === 'informacion')
                     <section>
                         <p class="mb-3 flex items-center gap-2 text-[12px] font-bold tracking-wide text-signal uppercase">
                             <flux:icon name="information-circle" class="size-4" /> Identificación
@@ -123,13 +165,16 @@
                             @endif
                         </div>
                     </section>
+                    @endif
 
+                    @if ($pestanaActiva === 'equipos')
+                    {{-- Dónde está repartido el inventario, antes de lo que es. --}}
                     <section>
                         <p class="mb-3 flex items-center gap-2 text-[12px] font-bold tracking-wide text-signal uppercase">
-                            <flux:icon name="cpu-chip" class="size-4" />
-                            Inventario asignado
+                            <flux:icon name="map-pin" class="size-4" />
+                            Áreas y servicios
                             <span class="text-zinc-400 normal-case">
-                                ({{ $empresa->equipos_count }} {{ $empresa->equipos_count === 1 ? 'equipo' : 'equipos' }})
+                                ({{ $empresa->areas->count() }} {{ $empresa->areas->count() === 1 ? 'área' : 'áreas' }})
                             </span>
                         </p>
 
@@ -148,6 +193,80 @@
                         </div>
                     </section>
 
+                    {{-- El inventario en sí. Las áreas de arriba dicen dónde
+                         está repartido; esto dice qué es. Se recorta al tope y
+                         se remite al módulo de equipos, que es el que tiene
+                         filtros y paginación. --}}
+                    <section>
+                        <p class="mb-3 flex items-center gap-2 text-[12px] font-bold tracking-wide text-signal uppercase">
+                            <flux:icon name="rectangle-stack" class="size-4" />
+                            Equipos asignados
+                            <span class="text-zinc-400 normal-case">
+                                ({{ $empresa->equipos_count }} {{ $empresa->equipos_count === 1 ? 'equipo' : 'equipos' }})
+                            </span>
+                        </p>
+
+                        <div class="space-y-2">
+                            @forelse ($equipos as $equipo)
+                                <div
+                                    wire:key="ficha-equipo-{{ $equipo->id }}"
+                                    class="flex flex-wrap items-center gap-3 rounded-xl border border-zinc-200 px-4 py-2.5 dark:border-zinc-700"
+                                >
+                                    <span class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-carbon to-carbon-deep text-[11px] font-bold text-white shadow-sm">
+                                        @if ($equipo->fotoUrl())
+                                            <img src="{{ $equipo->fotoUrl() }}" alt="{{ $equipo->descripcion }}" class="size-full object-cover">
+                                        @else
+                                            {{ $equipo->iniciales() }}
+                                        @endif
+                                    </span>
+
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-[13.5px] font-semibold text-carbon dark:text-zinc-100">{{ $equipo->descripcion }}</p>
+                                        <p class="truncate text-[12px] text-zinc-500 dark:text-zinc-400">
+                                            <span class="font-mono">{{ $equipo->numero_serie ?: 'Sin serie' }}</span>
+                                            · {{ $equipo->marca?->nombre ?? 'Sin marca' }}
+                                            {{ $equipo->modelo?->nombre ? '/ '.$equipo->modelo->nombre : '' }}
+                                            · {{ $equipo->area?->nombre ?? 'Sin área' }}
+                                        </p>
+                                    </div>
+
+                                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                        @if ($equipo->clasificacion_riesgo)
+                                            <span class="eq-chip bg-signal/10 text-signal-600 dark:text-signal">Riesgo {{ $equipo->clasificacion_riesgo }}</span>
+                                        @endif
+
+                                        <span @class([
+                                            'eq-chip',
+                                            'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' => $equipo->estado_operativo === 'operativo',
+                                            'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' => $equipo->estado_operativo === 'fuera_servicio',
+                                            'bg-zinc-100 text-zinc-600 dark:bg-zinc-700/40 dark:text-zinc-300' => $equipo->estado_operativo === 'dado_baja',
+                                        ])>
+                                            {{ $estadosOperativos[$equipo->estado_operativo] ?? $equipo->estado_operativo }}
+                                        </span>
+                                    </div>
+                                </div>
+                            @empty
+                                <p class="text-[13px] text-zinc-500 dark:text-zinc-400">
+                                    Esta institución todavía no tiene equipos asignados en el inventario.
+                                </p>
+                            @endforelse
+                        </div>
+
+                        @if ($empresa->equipos_count > $topeEquipos)
+                            <p class="mt-3 text-[12px] text-zinc-500 dark:text-zinc-400">
+                                Se muestran los primeros {{ $topeEquipos }} de {{ $empresa->equipos_count }} equipos.
+                            </p>
+                        @endif
+
+                        @if ($empresa->equipos_count > 0)
+                            <a href="{{ route('equipos.index', ['empresa' => $empresa->id]) }}" class="eq-enlace mt-3 inline-block" wire:navigate>
+                                Ver el inventario completo en el módulo de equipos
+                            </a>
+                        @endif
+                    </section>
+                    @endif
+
+                    @if ($pestanaActiva === 'usuarios')
                     {{-- Quién entra al sistema por esta IPS. Se ve desde aquí,
                          que es donde nace la pregunta; se administra en el
                          módulo de usuarios, que es donde viven las tres clases
@@ -188,6 +307,7 @@
                             {{ $empresa->usuarios->isEmpty() ? 'Crear el acceso de esta institución' : 'Administrar sus usuarios' }}
                         </a>
                     </section>
+                    @endif
                 </div>
 
                 {{-- Pie --}}

@@ -190,6 +190,21 @@ select:focus[data-flux-control] {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap;
 }
 
+/* Pestaña de una ficha de sólo lectura. La activa se marca con la línea
+   inferior y no con relleno: la ficha ya tiene bastante color arriba. */
+.eq-tab {
+    @apply -mb-px inline-flex cursor-pointer items-center gap-2 border-b-2 px-1 py-3 text-[13px] font-semibold whitespace-nowrap transition duration-150 outline-none
+           focus-visible:ring-2 focus-visible:ring-lima/40;
+}
+
+.eq-tab-activa {
+    @apply border-lima text-carbon dark:text-zinc-100;
+}
+
+.eq-tab-inactiva {
+    @apply border-transparent text-zinc-500 hover:border-zinc-300 hover:text-carbon dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-100;
+}
+
 /* --- Modales ---
    La presencia del modal la decide el servidor (`@if` en el parcial), no
    `x-show`: ligado a `$wire`, en los modales teletransportados al <body> la

@@ -204,7 +204,13 @@ new #[Title('Empresas')] class extends Component {
 
         return Empresa::query()
             ->withCount('equipos')
-            ->with(['areas' => fn ($consulta) => $consulta->withCount('equipos')->orderBy('nombre')])
+            ->with([
+                'areas' => fn ($consulta) => $consulta->withCount('equipos')->orderBy('nombre'),
+                // Quién entra al sistema por esta IPS se responde aquí, que es
+                // donde nace la pregunta; crearlos y editarlos sigue siendo cosa
+                // del módulo de usuarios.
+                'usuarios' => fn ($consulta) => $consulta->orderBy('name'),
+            ])
             ->find($this->empresaVista);
     }
 

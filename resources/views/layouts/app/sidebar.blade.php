@@ -23,9 +23,13 @@
                     {{ __('Equipos') }}
                 </flux:sidebar.item>
 
-                <flux:sidebar.item class="eq-navitem" icon="building-office-2" :href="route('empresas.index')" :current="request()->routeIs('empresas.*')" wire:navigate>
-                    {{ __('Empresas') }}
-                </flux:sidebar.item>
+                {{-- Las pantallas de INGSOLMEP: quien no las puede abrir tampoco
+                     las ve en el menú, para no ofrecer una puerta cerrada. --}}
+                @can('gestionar-empresas')
+                    <flux:sidebar.item class="eq-navitem" icon="building-office-2" :href="route('empresas.index')" :current="request()->routeIs('empresas.*')" wire:navigate>
+                        {{ __('Empresas') }}
+                    </flux:sidebar.item>
+                @endcan
 
                 <flux:sidebar.item class="eq-navitem" icon="wrench-screwdriver" :href="route('mantenimientos.index')" :current="request()->routeIs('mantenimientos.*')" wire:navigate>
                     {{ __('Mantenimientos') }}
@@ -34,6 +38,12 @@
                 <flux:sidebar.item class="eq-navitem" icon="document-text" :href="route('reportes.index')" :current="request()->routeIs('reportes.*')" wire:navigate>
                     {{ __('Reportes') }}
                 </flux:sidebar.item>
+
+                @can('gestionar-usuarios')
+                    <flux:sidebar.item class="eq-navitem" icon="users" :href="route('usuarios.index')" :current="request()->routeIs('usuarios.*')" wire:navigate>
+                        {{ __('Usuarios') }}
+                    </flux:sidebar.item>
+                @endcan
             </flux:sidebar.nav>
 
             <flux:spacer />

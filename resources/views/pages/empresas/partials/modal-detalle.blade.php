@@ -147,6 +147,47 @@
                             @endforelse
                         </div>
                     </section>
+
+                    {{-- Quién entra al sistema por esta IPS. Se ve desde aquí,
+                         que es donde nace la pregunta; se administra en el
+                         módulo de usuarios, que es donde viven las tres clases
+                         de cuenta. --}}
+                    <section>
+                        <p class="mb-3 flex items-center gap-2 text-[12px] font-bold tracking-wide text-signal uppercase">
+                            <flux:icon name="users" class="size-4" />
+                            Usuarios de la institución
+                            <span class="text-zinc-400 normal-case">
+                                ({{ $empresa->usuarios->count() }} {{ $empresa->usuarios->count() === 1 ? 'cuenta' : 'cuentas' }})
+                            </span>
+                        </p>
+
+                        <div class="space-y-2">
+                            @forelse ($empresa->usuarios as $usuario)
+                                <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 px-4 py-2.5 dark:border-zinc-700">
+                                    <div class="min-w-0">
+                                        <p class="text-[13.5px] font-semibold text-carbon dark:text-zinc-100">{{ $usuario->name }}</p>
+                                        <p class="font-mono text-[12px] text-zinc-500 dark:text-zinc-400">{{ '@'.$usuario->username }} · {{ $usuario->email }}</p>
+                                    </div>
+
+                                    <span @class([
+                                        'eq-chip',
+                                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' => $usuario->activo,
+                                        'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400' => ! $usuario->activo,
+                                    ])>
+                                        {{ $usuario->activo ? 'Con acceso' : 'Sin acceso' }}
+                                    </span>
+                                </div>
+                            @empty
+                                <p class="text-[13px] text-zinc-500 dark:text-zinc-400">
+                                    Esta institución todavía no tiene cuentas para consultar sus equipos y mantenimientos.
+                                </p>
+                            @endforelse
+                        </div>
+
+                        <a href="{{ route('usuarios.index', ['empresa' => $empresa->id]) }}" class="eq-enlace mt-3 inline-block" wire:navigate>
+                            {{ $empresa->usuarios->isEmpty() ? 'Crear el acceso de esta institución' : 'Administrar sus usuarios' }}
+                        </a>
+                    </section>
                 </div>
 
                 {{-- Pie --}}

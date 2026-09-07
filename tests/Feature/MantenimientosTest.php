@@ -34,13 +34,14 @@ class MantenimientosTest extends TestCase
         $this->actingAs(User::factory()->create());
 
         $equipo = $this->equipo();
+        $tecnico = User::factory()->tecnico()->create(['name' => 'Luis Zapata']);
 
         Livewire::test('pages::mantenimientos.index')
             ->call('abrirCreacion', 'preventivo')
             ->assertSet('tipo', 'preventivo')
             ->set('equipo_id', (string) $equipo->id)
             ->set('fecha_programada', '2026-10-15')
-            ->set('tecnico', 'Luis Zapata')
+            ->set('tecnico_id', (string) $tecnico->id)
             ->set('descripcion', 'Rutina trimestral.')
             ->call('guardar')
             ->assertHasNoErrors()
@@ -51,6 +52,8 @@ class MantenimientosTest extends TestCase
             'empresa_id' => $equipo->empresa_id,
             'tipo' => 'preventivo',
             'estado' => 'programado',
+            'tecnico_id' => $tecnico->id,
+            // El nombre queda copiado en la orden, que es lo que sale impreso.
             'tecnico' => 'Luis Zapata',
         ]);
     }
@@ -241,17 +244,20 @@ class MantenimientosTest extends TestCase
             'fecha_programada' => '2026-09-10',
         ]);
 
+        $tecnica = User::factory()->tecnico()->create(['name' => 'Ana Pérez']);
+
         Livewire::test('pages::mantenimientos.index')
             ->call('editar', $mantenimiento->id)
             ->assertSet('equipo_id', (string) $equipo->id)
             ->assertSet('fecha_programada', '2026-09-10')
-            ->set('tecnico', 'Ana Pérez')
+            ->set('tecnico_id', (string) $tecnica->id)
             ->set('estado', 'en_proceso')
             ->call('guardar')
             ->assertHasNoErrors();
 
         $mantenimiento->refresh();
 
+        $this->assertSame($tecnica->id, $mantenimiento->tecnico_id);
         $this->assertSame('Ana Pérez', $mantenimiento->tecnico);
         $this->assertSame('en_proceso', $mantenimiento->estado);
     }

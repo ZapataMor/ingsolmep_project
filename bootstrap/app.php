@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\UsuarioActivo;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // así que llega sin cifrar y el servidor debe poder leerla tal cual.
         $middleware->encryptCookies(except: [
             'appearance',
+        ]);
+
+        $middleware->alias([
+            'activo' => UsuarioActivo::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

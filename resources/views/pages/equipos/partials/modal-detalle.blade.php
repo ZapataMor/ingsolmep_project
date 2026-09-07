@@ -205,19 +205,21 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" class="eq-btn eq-btn-ghost" wire:click="cerrarDetalle">Cerrar</button>
 
-                    <button
-                        type="button"
-                        class="eq-btn eq-btn-ghost hover:!border-rose-200 hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!border-rose-500/30 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
-                        wire:click="confirmarEliminacion({{ $equipo->id }})"
-                    >
-                        <flux:icon name="trash" variant="mini" class="size-4" />
-                        Eliminar
-                    </button>
+                    @can('gestionar-equipos')
+                        <button
+                            type="button"
+                            class="eq-btn eq-btn-ghost hover:!border-rose-200 hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!border-rose-500/30 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
+                            wire:click="confirmarEliminacion({{ $equipo->id }})"
+                        >
+                            <flux:icon name="trash" variant="mini" class="size-4" />
+                            Eliminar
+                        </button>
 
-                    <button type="button" class="eq-btn eq-btn-primary" wire:click="editar({{ $equipo->id }})">
-                        <flux:icon name="pencil-square" variant="mini" class="size-4" />
-                        Editar equipo
-                    </button>
+                        <button type="button" class="eq-btn eq-btn-primary" wire:click="editar({{ $equipo->id }})">
+                            <flux:icon name="pencil-square" variant="mini" class="size-4" />
+                            Editar equipo
+                        </button>
+                    @endcan
                 </div>
             </div>
         @endif

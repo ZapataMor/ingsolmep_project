@@ -161,7 +161,11 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // El registro público queda cerrado desde que hay roles: una cuenta
+        // creada desde la calle nacía como administrador y veía el inventario
+        // de todas las IPS. Las cuentas las crea el administrador en el módulo
+        // de usuarios, que es donde se decide el rol y la institución.
+        // Para reabrirlo basta con devolver aquí `Features::registration()`.
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

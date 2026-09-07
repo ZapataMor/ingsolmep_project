@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Contracts\RestringiblePorRol;
+use App\Models\Scopes\Visibilidad;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -27,7 +30,8 @@ use Illuminate\Support\Facades\Storage;
     'nombre', 'nit', 'email', 'ciudad', 'direccion',
     'telefono', 'celular', 'whatsapp', 'logo_path', 'activo',
 ])]
-class Empresa extends Model
+#[ScopedBy(Visibilidad::class)]
+class Empresa extends Model implements RestringiblePorRol
 {
     use SoftDeletes;
 
@@ -36,6 +40,16 @@ class Empresa extends Model
     protected function casts(): array
     {
         return ['activo' => 'boolean'];
+    }
+
+    /**
+     * Usuarios que entran al sistema por esta institución.
+     *
+     * @return HasMany<User, $this>
+     */
+    public function usuarios(): HasMany
+    {
+        return $this->hasMany(User::class);
     }
 
     /** @return HasMany<Area, $this> */
@@ -54,6 +68,24 @@ class Empresa extends Model
     public function mantenimientos(): HasMany
     {
         return $this->hasMany(Mantenimiento::class);
+    }
+
+    /**
+     * La institución sólo se ve a sí misma. El técnico ve aquellas en las que
+     * tiene trabajo asignado, que es lo que necesita para ubicar una orden.
+     */
+    public function restringirVisibilidad(Builder $consulta, User $usuario): void
+    {
+        match (true) {
+            $usuario->esInstitucion() => $consulta->whereKey($usuario->empresa_id ?? 0),
+            $usuario->esTecnico() => $consulta->whereIn($this->qualifyColumn('id'), Mantenimiento::query()
+                ->withoutGlobalScope(Visibilidad::class)
+                ->where('mantenimientos.tecnico_id', $usuario->id)
+                ->whereNotNull('mantenimientos.empresa_id')
+                ->select('mantenimientos.empresa_id')),
+            // Un rol que todavía no sabemos leer no ve nada: es el lado seguro.
+            default => $consulta->whereRaw('1 = 0'),
+        };
     }
 
     /**

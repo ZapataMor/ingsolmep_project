@@ -86,10 +86,15 @@
                     <td class="px-4 py-3 align-top">
                         <button
                             type="button"
-                            wire:click.stop="alternarActivo({{ $equipo->id }})"
-                            title="Cambiar estado"
+                            @can('gestionar-equipos')
+                                wire:click.stop="alternarActivo({{ $equipo->id }})"
+                                title="Cambiar estado"
+                            @else
+                                disabled
+                            @endcan
                             @class([
-                                'eq-chip cursor-pointer transition duration-200 hover:scale-110 hover:shadow-md',
+                                'eq-chip transition duration-200',
+                                'cursor-pointer hover:scale-110 hover:shadow-md' => auth()->user()->can('gestionar-equipos'),
                                 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400' => $equipo->activo,
                                 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400' => ! $equipo->activo,
                             ])

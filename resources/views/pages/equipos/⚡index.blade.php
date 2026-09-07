@@ -9,6 +9,7 @@ use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -536,8 +537,20 @@ new #[Title('Equipos')] class extends Component {
         $this->resetPage();
     }
 
+    /**
+     * Mantener la hoja de vida del equipo es cosa de INGSOLMEP: la institución
+     * la consulta y el técnico la lee antes de intervenir.
+     */
+    #[Computed]
+    public function puedeGestionar(): bool
+    {
+        return Gate::allows('gestionar-equipos');
+    }
+
     public function alternarActivo(int $id): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         $equipo = Equipo::findOrFail($id);
         $equipo->activo = ! $equipo->activo;
         $equipo->save();
@@ -584,12 +597,16 @@ new #[Title('Equipos')] class extends Component {
 
     public function abrirCreacion(): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         $this->reiniciarFormulario();
         $this->mostrarFormulario = true;
     }
 
     public function editar(int $id): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         $equipo = Equipo::with(['area', 'marca', 'modelo'])->findOrFail($id);
 
         // Editar desde la vista de detalle la reemplaza por el asistente.
@@ -695,6 +712,8 @@ new #[Title('Equipos')] class extends Component {
 
     public function guardar(): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         foreach (array_keys(self::PASOS) as $numero) {
             try {
                 $this->validate($this->reglasDelPaso($numero), [], $this->etiquetas());
@@ -806,6 +825,8 @@ new #[Title('Equipos')] class extends Component {
 
     public function confirmarEliminacion(int $id): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         // Eliminar desde la vista de detalle la reemplaza por la confirmación.
         $this->equipoVisto = null;
 
@@ -814,6 +835,8 @@ new #[Title('Equipos')] class extends Component {
 
     public function eliminar(): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         if ($this->equipoAEliminar === null) {
             return;
         }
@@ -985,10 +1008,12 @@ new #[Title('Equipos')] class extends Component {
             </p>
         </div>
 
-        <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
-            <flux:icon name="plus" variant="mini" class="size-4" />
-            Añadir equipo
-        </button>
+        @can('gestionar-equipos')
+            <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
+                <flux:icon name="plus" variant="mini" class="size-4" />
+                Añadir equipo
+            </button>
+        @endcan
     </div>
 
     {{-- ───────────────── Indicadores ───────────────── --}}

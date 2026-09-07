@@ -11,7 +11,7 @@
     </p>
     @if ($this->hayFiltrosActivos)
         <button type="button" class="eq-btn eq-btn-ghost" wire:click="limpiarFiltros">Limpiar filtros</button>
-    @else
+    @elsecan('gestionar-equipos')
         <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
             <flux:icon name="plus" variant="mini" class="size-4" /> Añadir equipo
         </button>

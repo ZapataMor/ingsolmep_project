@@ -15,6 +15,11 @@
             <div class="grid flex-1 text-start text-sm leading-tight">
                 <flux:heading class="truncate">{{ auth()->user()->name }}</flux:heading>
                 <flux:text class="truncate">{{ auth()->user()->email }}</flux:text>
+                {{-- Con qué perfil se está trabajando: es lo que explica por qué
+                     esta sesión ve unos equipos y no otros. --}}
+                <flux:text class="truncate text-[11px]">
+                    {{ auth()->user()->rolEtiqueta() }}@if (auth()->user()->empresa) · {{ auth()->user()->empresa->nombre }}@endif
+                </flux:text>
             </div>
         </div>
         <flux:menu.separator />

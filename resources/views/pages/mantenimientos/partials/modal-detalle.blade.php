@@ -203,20 +203,24 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <button type="button" class="eq-btn eq-btn-ghost" wire:click="cerrarDetalle">Cerrar</button>
 
-                        <button
-                            type="button"
-                            class="eq-btn eq-btn-ghost hover:!border-rose-200 hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!border-rose-500/30 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
-                            wire:click="confirmarEliminacion({{ $mantenimiento->id }})"
-                        >
-                            <flux:icon name="trash" variant="mini" class="size-4" />
-                            Eliminar
-                        </button>
+                        @can('asignar-mantenimientos')
+                            <button
+                                type="button"
+                                class="eq-btn eq-btn-ghost hover:!border-rose-200 hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!border-rose-500/30 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
+                                wire:click="confirmarEliminacion({{ $mantenimiento->id }})"
+                            >
+                                <flux:icon name="trash" variant="mini" class="size-4" />
+                                Eliminar
+                            </button>
+                        @endcan
 
                         @if ($mantenimiento->estaAbierto())
-                            <button type="button" class="eq-btn eq-btn-ghost" wire:click="marcarEjecutado({{ $mantenimiento->id }})">
-                                <flux:icon name="check-circle" variant="mini" class="size-4 text-emerald-500" />
-                                Marcar ejecutado
-                            </button>
+                            @can('ejecutar-mantenimiento', $mantenimiento)
+                                <button type="button" class="eq-btn eq-btn-ghost" wire:click="marcarEjecutado({{ $mantenimiento->id }})">
+                                    <flux:icon name="check-circle" variant="mini" class="size-4 text-emerald-500" />
+                                    Marcar ejecutado
+                                </button>
+                            @endcan
                         @endif
 
                         {{-- El reporte certifica un trabajo hecho: sólo existe con la orden ejecutada. --}}
@@ -233,10 +237,12 @@
                             </a>
                         @endif
 
-                        <button type="button" class="eq-btn eq-btn-primary" wire:click="editar({{ $mantenimiento->id }})">
-                            <flux:icon name="pencil-square" variant="mini" class="size-4" />
-                            Editar orden
-                        </button>
+                        @can('ejecutar-mantenimiento', $mantenimiento)
+                            <button type="button" class="eq-btn eq-btn-primary" wire:click="editar({{ $mantenimiento->id }})">
+                                <flux:icon name="pencil-square" variant="mini" class="size-4" />
+                                Editar orden
+                            </button>
+                        @endcan
                     </div>
                 </div>
             </div>

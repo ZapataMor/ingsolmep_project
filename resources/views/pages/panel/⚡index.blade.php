@@ -4,6 +4,7 @@ use App\Models\Empresa;
 use App\Models\Equipo;
 use App\Models\Mantenimiento;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\Computed;
@@ -397,10 +398,16 @@ new #[Title('Panel')] class extends Component {
     /**
      * Clave de caché con el mes en curso dentro: al cambiar de mes, todo lo que
      * dependía del anterior queda invalidado solo.
+     *
+     * Lleva además el alcance del usuario. Las consultas de esta pantalla salen
+     * recortadas por el scope global de visibilidad, así que sin este trozo el
+     * panel de la primera IPS que entrara se le serviría a la siguiente.
      */
     private function clave(string $bloque): string
     {
-        return 'panel:'.$this->hoy()->format('Y-m-d').':'.$bloque;
+        $alcance = Auth::user()?->claveVisibilidad() ?? 'todo';
+
+        return 'panel:'.$alcance.':'.$this->hoy()->format('Y-m-d').':'.$bloque;
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -27,6 +28,12 @@ class UserFactory extends Factory
         return [
             'name' => fake()->name(),
             'username' => fake()->unique()->userName(),
+            // El administrador es lo que era el único usuario hasta ahora, así
+            // que sigue siendo lo que sale por defecto.
+            'rol' => 'administrador',
+            'empresa_id' => null,
+            'telefono' => null,
+            'activo' => true,
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
@@ -35,6 +42,35 @@ class UserFactory extends Factory
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
         ];
+    }
+
+    /**
+     * Usuario de una institución prestadora del servicio de salud: sólo ve lo
+     * que cuelga de la empresa a la que se le vincula.
+     */
+    public function institucion(Empresa|int $empresa): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'rol' => 'institucion',
+            'empresa_id' => $empresa instanceof Empresa ? $empresa->id : $empresa,
+        ]);
+    }
+
+    /** Usuario técnico: sólo ve las órdenes que tiene asignadas. */
+    public function tecnico(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'rol' => 'tecnico',
+            'empresa_id' => null,
+        ]);
+    }
+
+    /** Cuenta sin acceso al sistema. */
+    public function inactivo(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'activo' => false,
+        ]);
     }
 
     /**

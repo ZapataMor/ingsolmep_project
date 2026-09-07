@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use App\Contracts\RestringiblePorRol;
+use App\Models\Scopes\Visibilidad;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,7 +37,8 @@ use Illuminate\Support\Facades\Storage;
     'voltios', 'temperatura', 'presion', 'peso', 'velocidad', 'tecnologia_predominante',
     'subtareas', 'accesorios_estado', 'componentes', 'observaciones_ot',
 ])]
-class Equipo extends Model
+#[ScopedBy(Visibilidad::class)]
+class Equipo extends Model implements RestringiblePorRol
 {
     use SoftDeletes;
 
@@ -167,6 +171,23 @@ class Equipo extends Model
     public function mantenimientos(): HasMany
     {
         return $this->hasMany(Mantenimiento::class);
+    }
+
+    /**
+     * La institución ve el inventario que se le asignó. El técnico ve los
+     * equipos sobre los que tiene o tuvo una orden: son los que necesita
+     * consultar antes de intervenirlos.
+     */
+    public function restringirVisibilidad(Builder $consulta, User $usuario): void
+    {
+        match (true) {
+            $usuario->esInstitucion() => $consulta->where($this->qualifyColumn('empresa_id'), $usuario->empresa_id ?? 0),
+            $usuario->esTecnico() => $consulta->whereIn($this->qualifyColumn('id'), Mantenimiento::query()
+                ->withoutGlobalScope(Visibilidad::class)
+                ->where('mantenimientos.tecnico_id', $usuario->id)
+                ->select('mantenimientos.equipo_id')),
+            default => $consulta->whereRaw('1 = 0'),
+        };
     }
 
     /**

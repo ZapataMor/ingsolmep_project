@@ -197,13 +197,24 @@
 
                                 <div>
                                     <label class="eq-label" for="mt-tecnico">Técnico responsable</label>
-                                    <input id="mt-tecnico" type="text" class="eq-input" wire:model="tecnico" placeholder="Ej: Luis Zapata" autocomplete="off" list="mt-tecnicos">
-                                    <datalist id="mt-tecnicos">
-                                        @foreach ($tecnicosSugeridos as $sugerencia)
-                                            <option value="{{ $sugerencia }}"></option>
+                                    <select id="mt-tecnico" class="eq-select" wire:model="tecnico_id" @cannot('asignar-mantenimientos') disabled @endcannot>
+                                        <option value="">Sin asignar</option>
+                                        @foreach ($tecnicosDisponibles as $tecnicoDisponible)
+                                            <option value="{{ $tecnicoDisponible->id }}">{{ $tecnicoDisponible->name }}</option>
                                         @endforeach
-                                    </datalist>
-                                    @error('tecnico') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
+                                    </select>
+
+                                    @if ($tecnicoLegado !== '')
+                                        <span class="eq-hint">
+                                            Registrado antes como «{{ $tecnicoLegado }}». Se conserva mientras no elija un técnico de la lista.
+                                        </span>
+                                    @elseif ($tecnicosDisponibles->isEmpty())
+                                        <span class="eq-hint">Todavía no hay usuarios de tipo técnico creados.</span>
+                                    @else
+                                        <span class="eq-hint">Es quien podrá abrir esta orden y cerrarla.</span>
+                                    @endif
+
+                                    @error('tecnico_id') <span class="eq-hint !text-rose-500">{{ $message }}</span> @enderror
                                 </div>
 
                                 <div>

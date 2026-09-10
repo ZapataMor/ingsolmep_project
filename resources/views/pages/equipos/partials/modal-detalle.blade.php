@@ -60,6 +60,13 @@
                     'Fecha de registro' => $equipo->created_at?->format('d/m/Y'),
                 ];
 
+                $coloresOrden = [
+                    'programado' => 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+                    'en_proceso' => 'bg-lima-soft text-lima-700 dark:bg-lima/15 dark:text-lima',
+                    'ejecutado' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+                    'cancelado' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400',
+                ];
+
                 $textos = array_filter([
                     'Observaciones técnicas' => $equipo->observaciones_tecnicas,
                     'Observaciones generales' => $equipo->observaciones_generales,
@@ -109,8 +116,51 @@
                 </div>
             </div>
 
-            {{-- Cuerpo --}}
+            {{-- Pestañas --}}
+            <div class="border-b border-zinc-200 px-6 sm:px-8 dark:border-zinc-800">
+                <nav class="flex flex-wrap gap-x-4 sm:gap-x-6" aria-label="Secciones de la ficha">
+                    @foreach ($pestanas as $clave => $definicion)
+                        @php $activa = $clave === $pestanaActiva; @endphp
+
+                        <button
+                            type="button"
+                            wire:click="verPestanaFicha('{{ $clave }}')"
+                            aria-current="{{ $activa ? 'page' : 'false' }}"
+                            @class([
+                                'eq-tab',
+                                'eq-tab-activa' => $activa,
+                                'eq-tab-inactiva' => ! $activa,
+                            ])
+                        >
+                            <flux:icon name="{{ $definicion['icono'] }}" variant="mini" @class(['size-4', 'text-lima' => $activa]) />
+                            {{ $definicion['titulo'] }}
+
+                            @if ($clave === 'mantenimientos')
+                                <span @class([
+                                    'rounded-full px-1.5 py-0.5 text-[10.5px] font-bold',
+                                    'bg-lima-soft text-lima-700 dark:bg-lima/15 dark:text-lima' => $activa,
+                                    'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' => ! $activa,
+                                ])>{{ $totalHistorial }}</span>
+                            @endif
+                        </button>
+                    @endforeach
+                </nav>
+            </div>
+
+            {{-- Cuerpo. Sólo se pinta la pestaña abierta: el historial además ni
+                 se consulta mientras la suya esté cerrada. --}}
             <div class="max-h-[60vh] space-y-6 overflow-y-auto px-6 py-6 sm:px-8">
+                @if ($pestanaActiva === 'informacion')
+                <section>
+                    <p class="mb-3 flex items-center gap-2 text-[12px] font-bold tracking-wide text-signal uppercase">
+                        <flux:icon name="calendar-days" class="size-4" /> Próximo mantenimiento
+                    </p>
+
+                    <div class="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+                        <x-semaforo-mantenimiento :equipo="$equipo" :titulo="false" :detalle="true" />
+                    </div>
+                </section>
+
                 <section>
                     <p class="mb-3 flex items-center gap-2 text-[12px] font-bold tracking-wide text-signal uppercase">
                         <flux:icon name="clipboard-document-list" class="size-4" /> Información general
@@ -195,6 +245,83 @@
                             </div>
                         @endforeach
                     </section>
+                @endif
+                @endif
+
+                @if ($pestanaActiva === 'mantenimientos')
+                {{-- Historial: lo que se le ha hecho al equipo, de lo más
+                     reciente a lo más antiguo. Se recorta al tope y se remite al
+                     módulo de mantenimientos, que es el que tiene filtros. --}}
+                <section>
+                    <p class="mb-3 flex items-center gap-2 text-[12px] font-bold tracking-wide text-signal uppercase">
+                        <flux:icon name="wrench-screwdriver" class="size-4" />
+                        Historial de mantenimientos
+                        <span class="text-zinc-400 normal-case">
+                            ({{ $totalHistorial }} {{ $totalHistorial === 1 ? 'orden' : 'órdenes' }})
+                        </span>
+                    </p>
+
+                    <ol class="space-y-2">
+                        @forelse ($historial as $orden)
+                            <li
+                                wire:key="ficha-orden-{{ $orden->id }}"
+                                class="rounded-xl border border-zinc-200 px-4 py-3 dark:border-zinc-700"
+                            >
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-mono text-[12px] font-bold text-carbon dark:text-zinc-100">{{ $orden->codigo() }}</span>
+
+                                    <span @class([
+                                        'eq-chip',
+                                        'bg-signal/10 text-signal-600 dark:bg-signal/15 dark:text-signal' => $orden->tipo === 'preventivo',
+                                        'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400' => $orden->tipo === 'correctivo',
+                                    ])>{{ $orden->tipoEtiqueta() }}</span>
+
+                                    <span class="eq-chip {{ $coloresOrden[$orden->estado] ?? '' }}">{{ $orden->estadoEtiqueta() }}</span>
+
+                                    @if ($orden->estaVencido())
+                                        <span class="eq-chip bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400">
+                                            <flux:icon name="bell-alert" variant="micro" class="size-3" />
+                                            Vencida
+                                        </span>
+                                    @endif
+
+                                    <span class="ml-auto text-[12px] text-zinc-500 dark:text-zinc-400">
+                                        {{ $orden->fecha_ejecucion?->format('d/m/Y') ?? $orden->fecha_programada->format('d/m/Y') }}
+                                    </span>
+                                </div>
+
+                                <p class="mt-1.5 text-[12px] text-zinc-500 dark:text-zinc-400">
+                                    Programada {{ $orden->fecha_programada->format('d/m/Y') }}
+                                    · {{ $orden->fecha_ejecucion ? 'ejecutada '.$orden->fecha_ejecucion->format('d/m/Y') : 'sin ejecutar' }}
+                                    · {{ $orden->responsable?->name ?: ($orden->tecnico ?: 'Sin técnico asignado') }}
+                                </p>
+
+                                @if (filled($orden->descripcion) || filled($orden->motivo))
+                                    <p class="mt-1.5 text-[13px] leading-relaxed text-carbon dark:text-zinc-200">
+                                        {{ $orden->descripcion ?: $orden->motivo }}
+                                    </p>
+                                @endif
+
+                                @if ($orden->presenta_novedad)
+                                    <p class="mt-2 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                                        <flux:icon name="exclamation-triangle" variant="micro" class="mt-0.5 size-3.5 shrink-0" />
+                                        <span>{{ $orden->novedad ?: 'Se reportó una novedad sin detallar.' }}</span>
+                                    </p>
+                                @endif
+                            </li>
+                        @empty
+                            <li class="text-[13px] text-zinc-500 dark:text-zinc-400">
+                                A este equipo todavía no se le ha registrado ningún mantenimiento.
+                            </li>
+                        @endforelse
+                    </ol>
+
+                    @if ($totalHistorial > $topeHistorial)
+                        <p class="mt-3 text-[12px] text-zinc-500 dark:text-zinc-400">
+                            Se muestran las {{ $topeHistorial }} órdenes más recientes de {{ $totalHistorial }}.
+                        </p>
+                    @endif
+                </section>
                 @endif
             </div>
 

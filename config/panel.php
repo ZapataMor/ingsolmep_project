@@ -33,7 +33,16 @@ return [
         'garantia_por_vencer' => (int) env('PANEL_DIAS_GARANTIA', 60),
 
         // Tiempo sin mantenimiento que deja a un equipo fuera de la rutina.
+        // Es también el intervalo con el que se estima la próxima visita de un
+        // equipo que todavía no tiene orden programada.
         'sin_mantenimiento' => (int) env('PANEL_DIAS_SIN_MANTENIMIENTO', 180),
+
+        // Días que faltan para el próximo mantenimiento a partir de los cuales
+        // el semáforo del equipo deja de estar en verde y pasa a avisar.
+        'mantenimiento_proximo' => (int) env('PANEL_DIAS_MANTENIMIENTO_PROXIMO', 7),
+
+        // Y aquellos a partir de los cuales el aviso ya no admite espera.
+        'mantenimiento_critico' => (int) env('PANEL_DIAS_MANTENIMIENTO_CRITICO', 3),
 
         // Día del mes desde el que tiene sentido reclamar un cronograma que no
         // ha arrancado: antes de esa fecha aún no hay retraso que reportar.

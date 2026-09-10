@@ -1,16 +1,17 @@
-{{-- Vista en tabla: densa y ordenable, para comparar y auditar el inventario. --}}
+{{-- Vista en tabla: densa y ordenable, para comparar el inventario. Lleva los
+     mismos datos que la tarjeta —equipo, marca y modelo, empresa, estado y
+     proximidad del mantenimiento—; la hoja de vida completa está en la ficha
+     que abre cada fila. --}}
 <div wire:loading.delay.class="opacity-50" class="overflow-x-auto transition-opacity">
-    <table class="w-full min-w-5xl text-left text-[13px]">
+    <table class="w-full min-w-3xl text-left text-[13px]">
         <thead class="bg-zinc-50/80 text-[11px] font-bold tracking-wide text-zinc-500 uppercase dark:bg-zinc-800/60 dark:text-zinc-400">
             <tr>
                 @php
                     $columnas = [
-                        ['clave' => 'numero_serie', 'titulo' => 'N.º de serie', 'ordenable' => true],
                         ['clave' => 'descripcion', 'titulo' => 'Equipo', 'ordenable' => true],
-                        ['clave' => null, 'titulo' => 'Empresa / Área', 'ordenable' => false],
                         ['clave' => null, 'titulo' => 'Marca / Modelo', 'ordenable' => false],
-                        ['clave' => null, 'titulo' => 'Observaciones técnicas', 'ordenable' => false],
-                        ['clave' => null, 'titulo' => 'Mantenimiento', 'ordenable' => false],
+                        ['clave' => null, 'titulo' => 'Empresa', 'ordenable' => false],
+                        ['clave' => null, 'titulo' => 'Próximo mantenimiento', 'ordenable' => false],
                         ['clave' => 'activo', 'titulo' => 'Estado', 'ordenable' => true],
                     ];
                 @endphp
@@ -44,8 +45,6 @@
                     title="Ver la ficha de {{ $equipo->descripcion }}"
                     class="cursor-pointer transition duration-150 outline-none hover:bg-lima-soft/40 focus-visible:bg-lima-soft/60 dark:hover:bg-zinc-800/50 dark:focus-visible:bg-zinc-800/70"
                 >
-                    <td class="px-4 py-3 align-top font-mono text-[12px] text-zinc-600 dark:text-zinc-300">{{ $equipo->numero_serie ?: '—' }}</td>
-
                     <td class="px-4 py-3 align-top">
                         <div class="flex items-center gap-3">
                             <span class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-carbon to-carbon-deep text-[11px] font-bold text-white shadow-sm">
@@ -56,18 +55,8 @@
                                 @endif
                             </span>
 
-                            <div class="min-w-0">
-                                <p class="font-semibold text-carbon dark:text-zinc-100">{{ $equipo->descripcion }}</p>
-                                @if ($equipo->clasificacion_riesgo)
-                                    <span class="eq-chip mt-0.5 bg-signal/10 text-signal-600 dark:text-signal">Riesgo {{ $equipo->clasificacion_riesgo }}</span>
-                                @endif
-                            </div>
+                            <p class="min-w-0 font-semibold text-carbon dark:text-zinc-100">{{ $equipo->descripcion }}</p>
                         </div>
-                    </td>
-
-                    <td class="px-4 py-3 align-top">
-                        <p class="font-medium text-carbon dark:text-zinc-200">{{ $equipo->empresa?->nombre ?? '—' }}</p>
-                        <p class="text-[12px] text-zinc-500 dark:text-zinc-400">{{ $equipo->area?->nombre ?? 'Sin área' }}</p>
                     </td>
 
                     <td class="px-4 py-3 align-top">
@@ -75,12 +64,12 @@
                         <p class="text-[12px] text-zinc-500 dark:text-zinc-400">{{ $equipo->modelo?->nombre ?? '—' }}</p>
                     </td>
 
-                    <td class="max-w-56 px-4 py-3 align-top text-zinc-600 dark:text-zinc-300">
-                        <span class="line-clamp-2" title="{{ $equipo->observaciones_tecnicas }}">{{ $equipo->observaciones_tecnicas ?: '—' }}</span>
+                    <td class="px-4 py-3 align-top">
+                        <p class="font-medium text-carbon dark:text-zinc-200">{{ $equipo->empresa?->nombre ?? 'Sin asignar' }}</p>
                     </td>
 
-                    <td class="max-w-56 px-4 py-3 align-top text-zinc-600 dark:text-zinc-300">
-                        <span class="line-clamp-2" title="{{ $equipo->mantenimiento }}">{{ $equipo->mantenimiento ?: '—' }}</span>
+                    <td class="px-4 py-3 align-top">
+                        <x-semaforo-mantenimiento :equipo="$equipo" :titulo="false" class="w-44" />
                     </td>
 
                     <td class="px-4 py-3 align-top">
@@ -111,7 +100,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="px-4 py-16 text-center">
+                    <td colspan="5" class="px-4 py-16 text-center">
                         @include('pages.equipos.partials.lista-vacia')
                     </td>
                 </tr>

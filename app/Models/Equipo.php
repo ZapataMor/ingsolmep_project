@@ -4,12 +4,14 @@ namespace App\Models;
 
 use App\Contracts\RestringiblePorRol;
 use App\Models\Scopes\Visibilidad;
+use App\Support\SemaforoMantenimiento;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
@@ -171,6 +173,31 @@ class Equipo extends Model implements RestringiblePorRol
     public function mantenimientos(): HasMany
     {
         return $this->hasMany(Mantenimiento::class);
+    }
+
+    /**
+     * La orden abierta más próxima: la que dice cuándo le toca al equipo.
+     *
+     * Va como relación y no como consulta suelta para poder precargarla con el
+     * listado, donde cada tarjeta pinta su semáforo.
+     *
+     * @return HasOne<Mantenimiento, $this>
+     */
+    public function proximoMantenimiento(): HasOne
+    {
+        return $this->hasOne(Mantenimiento::class)->ofMany(
+            ['fecha_programada' => 'min', 'id' => 'min'],
+            fn (Builder $abiertas) => $abiertas->whereIn('estado', Mantenimiento::ESTADOS_ABIERTOS),
+        );
+    }
+
+    /**
+     * Cuánto le falta al equipo para su próximo mantenimiento, o null si no hay
+     * fecha de la que partir. Ver {@see SemaforoMantenimiento}.
+     */
+    public function semaforoMantenimiento(): ?SemaforoMantenimiento
+    {
+        return SemaforoMantenimiento::para($this);
     }
 
     /**

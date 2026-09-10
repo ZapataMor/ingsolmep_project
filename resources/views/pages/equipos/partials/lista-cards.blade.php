@@ -1,5 +1,7 @@
-{{-- Vista en tarjetas: pensada para reconocer el equipo de un vistazo (foto,
-     riesgo y estado). Para comparar muchos registros está la vista de tabla. --}}
+{{-- Vista en tarjetas: pensada para reconocer el equipo de un vistazo. Muestra
+     sólo lo que sirve para identificarlo y para saber si urge —equipo, marca y
+     modelo, empresa, estado y proximidad del mantenimiento—; el resto de la
+     hoja de vida está en la ficha que abre la propia tarjeta. --}}
 <div wire:loading.delay.class="opacity-50" class="transition-opacity">
     @if ($this->equipos->isNotEmpty())
         <div class="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -27,43 +29,22 @@
                             <p class="truncate text-[14px] font-semibold text-carbon dark:text-zinc-100" title="{{ $equipo->descripcion }}">
                                 {{ $equipo->descripcion }}
                             </p>
-                            <p class="mt-0.5 truncate font-mono text-[12px] text-zinc-500 dark:text-zinc-400">
-                                {{ $equipo->numero_serie ?: 'Sin número de serie' }}
+                            <p class="mt-0.5 truncate text-[12px] text-zinc-500 dark:text-zinc-400">
+                                {{ $equipo->marca?->nombre ?? 'Sin marca' }} · {{ $equipo->modelo?->nombre ?? 'Sin modelo' }}
                             </p>
-
-                            @if ($equipo->clasificacion_riesgo)
-                                <span class="eq-chip mt-1.5 bg-signal/10 text-signal-600 dark:text-signal">Riesgo {{ $equipo->clasificacion_riesgo }}</span>
-                            @endif
                         </div>
                     </div>
 
-                    {{-- Ubicación, catálogo y notas --}}
-                    <div class="grid grid-cols-2 gap-x-3 gap-y-3 p-4 text-[13px]">
+                    {{-- Empresa y proximidad del mantenimiento --}}
+                    <div class="space-y-3 p-4 text-[13px]">
                         <div class="min-w-0">
-                            <p class="eq-card-dato">Empresa / Área</p>
-                            <p class="truncate font-medium text-carbon dark:text-zinc-200">{{ $equipo->empresa?->nombre ?? '—' }}</p>
-                            <p class="truncate text-[12px] text-zinc-500 dark:text-zinc-400">{{ $equipo->area?->nombre ?? 'Sin área' }}</p>
-                        </div>
-
-                        <div class="min-w-0">
-                            <p class="eq-card-dato">Marca / Modelo</p>
-                            <p class="truncate font-medium text-carbon dark:text-zinc-200">{{ $equipo->marca?->nombre ?? '—' }}</p>
-                            <p class="truncate text-[12px] text-zinc-500 dark:text-zinc-400">{{ $equipo->modelo?->nombre ?? '—' }}</p>
-                        </div>
-
-                        <div class="col-span-2 min-w-0">
-                            <p class="eq-card-dato">Observaciones técnicas</p>
-                            <p class="line-clamp-2 text-zinc-600 dark:text-zinc-300" title="{{ $equipo->observaciones_tecnicas }}">
-                                {{ $equipo->observaciones_tecnicas ?: '—' }}
+                            <p class="eq-card-dato">Empresa</p>
+                            <p class="truncate font-medium text-carbon dark:text-zinc-200" title="{{ $equipo->empresa?->nombre }}">
+                                {{ $equipo->empresa?->nombre ?? 'Sin asignar' }}
                             </p>
                         </div>
 
-                        <div class="col-span-2 min-w-0">
-                            <p class="eq-card-dato">Mantenimiento</p>
-                            <p class="line-clamp-2 text-zinc-600 dark:text-zinc-300" title="{{ $equipo->mantenimiento }}">
-                                {{ $equipo->mantenimiento ?: '—' }}
-                            </p>
-                        </div>
+                        <x-semaforo-mantenimiento :equipo="$equipo" />
                     </div>
 
                     {{-- Estado: el chip sigue siendo el interruptor de servicio --}}

@@ -3,6 +3,7 @@
 use App\Models\Area;
 use App\Models\Empresa;
 use App\Models\Equipo;
+use App\Models\Mantenimiento;
 use App\Models\Marca;
 use App\Models\Modelo;
 use Flux\Flux;
@@ -235,6 +236,9 @@ new #[Title('Equipos')] class extends Component {
 
     public ?int $equipoVisto = null;
 
+    /** Pestaña abierta en la ficha. Ver {@see self::PESTANAS_FICHA}. */
+    public string $fichaPestana = 'informacion';
+
     public string $listadoVisto = '';
 
     /**
@@ -271,6 +275,24 @@ new #[Title('Equipos')] class extends Component {
     /** Máximo de filas que muestra el modal de listado antes de recortar. */
     public const TOPE_LISTADO = 100;
 
+    /**
+     * Las dos preguntas que se le hacen a un equipo: qué es y qué se le ha
+     * hecho. Cada una es una pestaña de la ficha.
+     *
+     * @var array<string, array{titulo: string, icono: string}>
+     */
+    public const PESTANAS_FICHA = [
+        'informacion' => ['titulo' => 'Información', 'icono' => 'clipboard-document-list'],
+        'mantenimientos' => ['titulo' => 'Mantenimientos', 'icono' => 'wrench-screwdriver'],
+    ];
+
+    /**
+     * Máximo de órdenes que lista el historial de la ficha. La ficha resuelve
+     * «qué se le ha hecho a este equipo», no reemplaza al módulo de
+     * mantenimientos: pasado el tope se remite allí, que tiene filtros.
+     */
+    public const TOPE_HISTORIAL = 50;
+
     public function mount(): void
     {
         $this->reiniciarFormulario();
@@ -287,7 +309,7 @@ new #[Title('Equipos')] class extends Component {
         $columna = array_key_exists($this->ordenarPor, self::ORDENABLES) ? $this->ordenarPor : 'created_at';
 
         return Equipo::query()
-            ->with(['empresa', 'area', 'marca', 'modelo'])
+            ->with(['empresa', 'area', 'marca', 'modelo', 'proximoMantenimiento'])
             ->when($this->buscar !== '', function (Builder $consulta): void {
                 $termino = '%'.$this->buscar.'%';
 
@@ -421,7 +443,39 @@ new #[Title('Equipos')] class extends Component {
             return null;
         }
 
-        return Equipo::with(['empresa', 'area', 'marca', 'modelo'])->find($this->equipoVisto);
+        return Equipo::with(['empresa', 'area', 'marca', 'modelo', 'proximoMantenimiento'])->find($this->equipoVisto);
+    }
+
+    /**
+     * Historial de órdenes del equipo abierto, de la más reciente a la más
+     * antigua. Se ordena por la fecha en que se intervino el equipo y no por la
+     * de programación: el historial cuenta lo que pasó, no lo que se planeó.
+     *
+     * @return Collection<int, Mantenimiento>
+     */
+    #[Computed]
+    public function historialMantenimientos(): Collection
+    {
+        if ($this->equipoVisto === null || $this->fichaPestana !== 'mantenimientos') {
+            return collect();
+        }
+
+        return Mantenimiento::query()
+            ->where('equipo_id', $this->equipoVisto)
+            ->with('responsable')
+            ->orderByRaw('COALESCE(fecha_ejecucion, fecha_programada) desc')
+            ->orderByDesc('id')
+            ->limit(self::TOPE_HISTORIAL)
+            ->get();
+    }
+
+    /** Total de órdenes del equipo, para saber si el historial viene recortado. */
+    #[Computed]
+    public function totalHistorial(): int
+    {
+        return $this->equipoVisto === null
+            ? 0
+            : Mantenimiento::where('equipo_id', $this->equipoVisto)->count();
     }
 
     /**
@@ -570,6 +624,14 @@ new #[Title('Equipos')] class extends Component {
     public function verEquipo(int $id): void
     {
         $this->equipoVisto = $id;
+        $this->fichaPestana = 'informacion';
+    }
+
+    public function verPestanaFicha(string $pestana): void
+    {
+        if (array_key_exists($pestana, self::PESTANAS_FICHA)) {
+            $this->fichaPestana = $pestana;
+        }
     }
 
     public function cerrarDetalle(): void
@@ -1227,7 +1289,14 @@ new #[Title('Equipos')] class extends Component {
     @endteleport
 
     @teleport('body')
-        @include('pages.equipos.partials.modal-detalle', ['equipo' => $this->equipoDetalle])
+        @include('pages.equipos.partials.modal-detalle', [
+            'equipo' => $this->equipoDetalle,
+            'pestanas' => $this::PESTANAS_FICHA,
+            'pestanaActiva' => $this->fichaPestana,
+            'historial' => $this->historialMantenimientos,
+            'totalHistorial' => $this->totalHistorial,
+            'topeHistorial' => $this::TOPE_HISTORIAL,
+        ])
     @endteleport
 
     @teleport('body')

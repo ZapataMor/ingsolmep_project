@@ -1,9 +1,15 @@
 <?php
 
 use App\Http\Controllers\ReporteMantenimientoController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login')->name('home');
+// La raíz no es una pantalla, es un repartidor: manda al panel a quien ya tiene
+// sesión y al login a quien no. Enviar a todo el mundo a /login abría un ciclo
+// infinito de redirecciones, porque el middleware `guest` de Fortify devuelve a
+// la sesión ya iniciada precisamente a la ruta llamada `home`, que es esta.
+Route::get('/', fn () => redirect()->route(Auth::check() ? 'panel' : 'login'))
+    ->name('home');
 
 Route::middleware(['auth', 'verified', 'activo'])->group(function () {
     // Pantalla de aterrizaje: lo que necesita atención hoy, no el inventario.

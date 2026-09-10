@@ -2,6 +2,10 @@
 @php
     $totalPasos = count($pasosDefinicion);
     $definicionActual = $pasosDefinicion[$paso] ?? $pasosDefinicion[1];
+
+    // Editando, el equipo ya está completo: todas las fases quedan abiertas y
+    // la línea de tiempo se usa como pestañas para saltar a la que interesa.
+    $edicion = $equipoId !== null;
 @endphp
 
 <div
@@ -37,6 +41,9 @@
                     </h2>
                     <p class="mt-1 text-[12.5px] text-zinc-400">
                         Fase {{ $paso }} de {{ $totalPasos }} · {{ $definicionActual['titulo'] }}
+                        @if ($edicion)
+                            <span class="text-zinc-500">· Pulse una fase para editarla directamente</span>
+                        @endif
                     </p>
                 </div>
 
@@ -52,6 +59,10 @@
                         $completado = $numero < $paso;
                         $actual = $numero === $paso;
                         $alcanzable = $numero <= $pasoMaximo;
+                        // Fase abierta que todavía no se ha visitado en este
+                        // recorrido: se pinta distinta de la bloqueada para que
+                        // se vea que se puede pulsar.
+                        $disponible = $alcanzable && ! $completado && ! $actual;
                     @endphp
 
                     <li class="flex flex-1 items-center last:flex-none">
@@ -59,14 +70,16 @@
                             type="button"
                             wire:click="irAPaso({{ $numero }})"
                             @disabled(! $alcanzable)
-                            class="group flex shrink-0 items-center gap-2.5 rounded-xl px-1 py-1 text-left transition duration-200 disabled:cursor-not-allowed enabled:cursor-pointer enabled:hover:scale-[1.03]"
-                            title="{{ $definicion['titulo'] }}"
+                            @if ($actual) aria-current="step" @endif
+                            class="group flex shrink-0 items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition duration-200 outline-none focus-visible:ring-2 focus-visible:ring-lima/50 disabled:cursor-not-allowed enabled:cursor-pointer enabled:hover:scale-[1.03] enabled:hover:bg-white/10"
+                            title="{{ $alcanzable ? 'Ir a: '.$definicion['titulo'] : $definicion['titulo'].' (complete las fases anteriores)' }}"
                         >
                             <span @class([
                                 'eq-step-dot',
                                 'border-lima bg-lima text-carbon-deep shadow-lg shadow-lima/30' => $completado,
                                 'border-lima bg-carbon-deep text-lima ring-4 ring-lima/25' => $actual,
-                                'border-white/20 bg-white/5 text-zinc-500' => ! $completado && ! $actual,
+                                'border-white/40 bg-white/10 text-zinc-200 group-hover:border-lima/70 group-hover:text-lima' => $disponible,
+                                'border-white/15 bg-white/5 text-zinc-600' => ! $alcanzable,
                             ])>
                                 @if ($completado)
                                     <flux:icon name="check" variant="mini" class="size-4" />
@@ -79,7 +92,8 @@
                                 'hidden text-[12px] font-semibold whitespace-nowrap lg:block',
                                 'text-lima' => $actual,
                                 'text-zinc-300' => $completado,
-                                'text-zinc-500' => ! $completado && ! $actual,
+                                'text-zinc-300 group-hover:text-lima' => $disponible,
+                                'text-zinc-600' => ! $alcanzable,
                             ])>{{ $definicion['titulo'] }}</span>
                         </button>
 
@@ -151,12 +165,25 @@
                     @endif
 
                     @if ($paso < $totalPasos)
-                        <button type="button" class="eq-btn eq-btn-primary" wire:click="siguiente">
+                        {{-- Editando, «Siguiente» pasa a ser navegación y el botón
+                             de peso es guardar: el cambio puede estar en cualquier
+                             fase y no hay por qué recorrer el resto para grabarlo. --}}
+                        <button type="button" class="eq-btn {{ $edicion ? 'eq-btn-ghost' : 'eq-btn-primary' }}" wire:click="siguiente">
                             Siguiente
                             <flux:icon name="chevron-right" variant="micro" class="size-3.5" />
                         </button>
-                    @else
-                        <button type="submit" class="eq-btn eq-btn-accent" wire:loading.attr="disabled" wire:target="guardar">
+                    @endif
+
+                    @if ($edicion || $paso === $totalPasos)
+                        {{-- En las fases intermedias va como `button`, no como
+                             `submit`, para no volver «Enter» un guardado
+                             accidental mientras se escribe en un campo. --}}
+                        <button
+                            @if ($paso === $totalPasos) type="submit" @else type="button" wire:click="guardar" @endif
+                            class="eq-btn eq-btn-accent"
+                            wire:loading.attr="disabled"
+                            wire:target="guardar"
+                        >
                             <flux:icon name="check" variant="mini" class="size-4" wire:loading.remove wire:target="guardar" />
                             <flux:icon name="arrow-path" variant="mini" class="size-4 animate-spin" wire:loading wire:target="guardar" />
                             {{ $equipoId ? 'Guardar cambios' : 'Guardar equipo' }}

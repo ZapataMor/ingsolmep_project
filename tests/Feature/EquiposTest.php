@@ -199,6 +199,77 @@ class EquiposTest extends TestCase
             ->assertSet('fichaPestana', 'informacion');
     }
 
+    public function test_editando_se_puede_saltar_a_cualquier_fase_sin_recorrer_las_anteriores(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        // El equipo llega con campos obligatorios de la primera fase en blanco,
+        // como los que arrastra el inventario importado. Aun así se debe poder
+        // ir directamente a la fase que se quiere tocar.
+        $equipo = $this->equipoDePrueba();
+
+        Livewire::test('pages::equipos.index')
+            ->call('editar', $equipo->id)
+            ->assertSet('paso', 1)
+            ->call('irAPaso', 3)
+            ->assertHasNoErrors()
+            ->assertSet('paso', 3)
+            ->call('irAPaso', 5)
+            ->assertHasNoErrors()
+            ->assertSet('paso', 5);
+    }
+
+    public function test_registrando_no_se_puede_saltar_una_fase_sin_completar_la_anterior(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        Livewire::test('pages::equipos.index')
+            ->call('abrirCreacion')
+            ->call('irAPaso', 3)
+            ->assertHasErrors(['descripcion' => 'required'])
+            ->assertSet('paso', 1);
+    }
+
+    public function test_editando_se_guardan_los_cambios_desde_una_fase_intermedia(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $equipo = $this->equipoDePrueba();
+        $equipo->update([
+            'clasificacion_riesgo' => 'IIB',
+            'clasificacion_especialidad' => 'Cuidado crítico',
+            'observaciones_tecnicas' => 'Sin novedades',
+        ]);
+
+        Livewire::test('pages::equipos.index')
+            ->call('editar', $equipo->id)
+            ->call('irAPaso', 3)
+            ->set('subtareas.prueba_fugas', true)
+            // Guardar desde la fase 3, sin pasar por las dos que faltan.
+            ->call('guardar')
+            ->assertHasNoErrors()
+            ->assertSet('mostrarFormulario', false);
+
+        $this->assertTrue($equipo->fresh()->subtareas['prueba_fugas']);
+    }
+
+    public function test_al_guardar_desde_una_fase_intermedia_se_avisa_de_lo_que_falta_en_otra(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        // Sin `clasificacion_riesgo`: el hueco está en la fase 1 y el guardado
+        // se pide desde la 3, así que el asistente debe devolver allí.
+        $equipo = $this->equipoDePrueba();
+
+        Livewire::test('pages::equipos.index')
+            ->call('editar', $equipo->id)
+            ->call('irAPaso', 3)
+            ->call('guardar')
+            ->assertHasErrors(['clasificacion_riesgo'])
+            ->assertSet('paso', 1)
+            ->assertSet('mostrarFormulario', true);
+    }
+
     private function equipoDePrueba(string $descripcion = 'MONITOR DE SIGNOS VITALES'): Equipo
     {
         $empresa = Empresa::firstOrCreate(['nombre' => 'Clínica del Norte'], ['nit' => '900111222-1']);

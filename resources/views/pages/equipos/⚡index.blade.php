@@ -753,8 +753,15 @@ new #[Title('Equipos')] class extends Component {
     }
 
     /**
-     * Salta a una fase concreta. Hacia adelante sólo si las fases
-     * intermedias ya están completas.
+     * Salta a una fase concreta.
+     *
+     * Registrando, hacia adelante sólo si las fases intermedias ya están
+     * completas: el asistente guía el alta. Editando se navega libremente,
+     * porque el cambio puede estar en cualquier fase y exigir el repaso de
+     * las anteriores sólo estorba; parte del inventario entró por importación
+     * y arrastra campos obligatorios en blanco que bloquearían el salto.
+     * Lo que no puede quedar a medias es el guardado, y de eso ya se encarga
+     * {@see guardar()}, que valida las cinco fases antes de escribir.
      */
     public function irAPaso(int $destino): void
     {
@@ -762,11 +769,13 @@ new #[Title('Equipos')] class extends Component {
             return;
         }
 
-        if ($destino > $this->paso) {
+        if ($this->equipoId === null && $destino > $this->paso) {
             for ($intermedio = $this->paso; $intermedio < $destino; $intermedio++) {
                 $this->validate($this->reglasDelPaso($intermedio), [], $this->etiquetas());
             }
         }
+
+        $this->resetValidation();
 
         $this->paso = $destino;
         $this->pasoMaximo = max($this->pasoMaximo, $destino);

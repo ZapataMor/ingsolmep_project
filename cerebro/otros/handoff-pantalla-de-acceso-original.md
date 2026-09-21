@@ -1,3 +1,11 @@
+---
+tags: [otros, diseno, fuente]
+origen: "Pantalla de acceso INGSOLMEP/design_handoff_login_ingsolmep/README.md (commit 0673ef2, 2026-08-31)"
+recuperado: 2026-09-16
+---
+
+> **Nota de origen.** Copia íntegra del README del paquete de diseño de la pantalla de acceso, recuperada de git el 2026-09-16 porque la carpeta estaba borrada en el working tree. El prototipo `Pantalla de acceso.dc.html` y `support.js` siguen en el historial (commit `0673ef2`). Implementación real en `resources/views/layouts/auth/ingsolmep.blade.php` y `resources/views/pages/auth/login.blade.php`. Índice: [[otros/README|otros]].
+
 # Handoff: Pantalla de acceso INGSOLMEP
 
 ## Overview

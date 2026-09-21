@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Contracts\RestringiblePorRol;
+use App\Models\Scopes\Visibilidad;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,7 +34,8 @@ use Illuminate\Support\Facades\Date;
     'generado_por', 'ultimo_generado_por',
     'generado_en', 'ultima_generacion', 'veces_generado',
 ])]
-class Reporte extends Model
+#[ScopedBy(Visibilidad::class)]
+class Reporte extends Model implements RestringiblePorRol
 {
     protected $table = 'reportes';
 
@@ -92,6 +96,21 @@ class Reporte extends Model
         $reporte->save();
 
         return $reporte;
+    }
+
+    /**
+     * El reporte se ve si se ve la orden que documenta.
+     */
+    public function restringirVisibilidad(Builder $consulta, User $usuario): void
+    {
+        match (true) {
+            $usuario->esInstitucion() => $consulta->where($this->qualifyColumn('empresa_id'), $usuario->empresa_id ?? 0),
+            $usuario->esTecnico() => $consulta->whereIn($this->qualifyColumn('mantenimiento_id'), Mantenimiento::query()
+                ->withoutGlobalScope(Visibilidad::class)
+                ->where('mantenimientos.tecnico_id', $usuario->id)
+                ->select('mantenimientos.id')),
+            default => $consulta->whereRaw('1 = 0'),
+        };
     }
 
     /**

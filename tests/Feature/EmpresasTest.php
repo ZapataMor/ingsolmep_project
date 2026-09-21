@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Empresa;
+use App\Models\Equipo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -122,5 +123,115 @@ class EmpresasTest extends TestCase
             ->set('buscar', 'Maicao')
             ->assertSee('IPS del Sur')
             ->assertDontSee('Clínica del Norte');
+    }
+
+    public function test_la_ficha_de_la_empresa_lista_sus_equipos_asignados(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $propia = Empresa::create(['nombre' => 'Clínica del Norte', 'nit' => '111']);
+        $ajena = Empresa::create(['nombre' => 'IPS del Sur', 'nit' => '222']);
+
+        Equipo::create([
+            'empresa_id' => $propia->id,
+            'descripcion' => 'MONITOR DE SIGNOS VITALES',
+            'numero_serie' => 'SN-0001',
+        ]);
+
+        Equipo::create([
+            'empresa_id' => $ajena->id,
+            'descripcion' => 'VENTILADOR MECANICO',
+            'numero_serie' => 'SN-0002',
+        ]);
+
+        Livewire::test('pages::empresas.index')
+            ->call('verEmpresa', $propia->id)
+            ->call('verPestanaFicha', 'equipos')
+            ->assertSee('Equipos asignados')
+            ->assertSee('MONITOR DE SIGNOS VITALES')
+            ->assertSee('SN-0001')
+            ->assertDontSee('VENTILADOR MECANICO');
+    }
+
+    public function test_la_ficha_avisa_cuando_la_empresa_no_tiene_equipos(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $empresa = Empresa::create(['nombre' => 'Clínica sin inventario', 'nit' => '333']);
+
+        Livewire::test('pages::empresas.index')
+            ->call('verEmpresa', $empresa->id)
+            ->call('verPestanaFicha', 'equipos')
+            ->assertSee('Esta institución todavía no tiene equipos asignados en el inventario.', false);
+    }
+
+    public function test_la_ficha_abre_en_informacion_y_separa_equipos_y_usuarios_por_pestanas(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $empresa = Empresa::create(['nombre' => 'Clínica del Norte', 'nit' => '111']);
+
+        Equipo::create([
+            'empresa_id' => $empresa->id,
+            'descripcion' => 'MONITOR DE SIGNOS VITALES',
+            'numero_serie' => 'SN-0001',
+        ]);
+
+        User::factory()->create([
+            'name' => 'Recepción Norte',
+            'rol' => 'institucion',
+            'empresa_id' => $empresa->id,
+        ]);
+
+        // Se comprueba con los títulos de sección, no con los datos: el nombre
+        // o el correo de la empresa también salen en la tabla del fondo.
+        $componente = Livewire::test('pages::empresas.index')->call('verEmpresa', $empresa->id);
+
+        $componente
+            ->assertSet('fichaPestana', 'informacion')
+            ->assertSee('Identificación', false)
+            ->assertDontSee('Equipos asignados')
+            ->assertDontSee('Usuarios de la institución', false);
+
+        $componente
+            ->call('verPestanaFicha', 'equipos')
+            ->assertSee('Equipos asignados')
+            ->assertSee('MONITOR DE SIGNOS VITALES')
+            ->assertDontSee('Identificación', false)
+            ->assertDontSee('Usuarios de la institución', false);
+
+        $componente
+            ->call('verPestanaFicha', 'usuarios')
+            ->assertSee('Usuarios de la institución', false)
+            ->assertSee('Recepción Norte', false)
+            ->assertDontSee('Identificación', false)
+            ->assertDontSee('Equipos asignados');
+    }
+
+    public function test_una_pestana_inexistente_no_cambia_la_ficha(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $empresa = Empresa::create(['nombre' => 'Clínica del Norte', 'nit' => '111']);
+
+        Livewire::test('pages::empresas.index')
+            ->call('verEmpresa', $empresa->id)
+            ->call('verPestanaFicha', 'mantenimientos')
+            ->assertSet('fichaPestana', 'informacion');
+    }
+
+    public function test_cada_ficha_se_abre_por_su_primera_pestana(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $primera = Empresa::create(['nombre' => 'Clínica del Norte', 'nit' => '111']);
+        $segunda = Empresa::create(['nombre' => 'IPS del Sur', 'nit' => '222']);
+
+        Livewire::test('pages::empresas.index')
+            ->call('verEmpresa', $primera->id)
+            ->call('verPestanaFicha', 'usuarios')
+            ->call('cerrarDetalle')
+            ->call('verEmpresa', $segunda->id)
+            ->assertSet('fichaPestana', 'informacion');
     }
 }

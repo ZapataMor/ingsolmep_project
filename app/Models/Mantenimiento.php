@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Contracts\RestringiblePorRol;
+use App\Models\Scopes\Visibilidad;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +25,7 @@ use Illuminate\Support\Facades\Date;
  * @property Carbon $fecha_programada
  * @property Carbon|null $fecha_ejecucion
  * @property string|null $tecnico
+ * @property int|null $tecnico_id
  * @property bool $presenta_novedad
  * @property string|null $novedad
  * @property array<string, bool>|null $subtareas
@@ -29,12 +33,13 @@ use Illuminate\Support\Facades\Date;
  */
 #[Fillable([
     'equipo_id', 'empresa_id', 'tipo', 'estado', 'prioridad',
-    'fecha_programada', 'fecha_ejecucion', 'tecnico',
+    'fecha_programada', 'fecha_ejecucion', 'tecnico', 'tecnico_id',
     'motivo', 'descripcion', 'repuestos', 'observaciones', 'costo',
     'presenta_novedad', 'novedad',
     'subtareas', 'accesorios_estado',
 ])]
-class Mantenimiento extends Model
+#[ScopedBy(Visibilidad::class)]
+class Mantenimiento extends Model implements RestringiblePorRol
 {
     use SoftDeletes;
 
@@ -91,6 +96,29 @@ class Mantenimiento extends Model
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
+    }
+
+    /**
+     * Usuario técnico responsable de la orden. Puede faltar en las órdenes
+     * antiguas, que sólo guardaban el nombre escrito a mano en `tecnico`.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function responsable(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'tecnico_id');
+    }
+
+    /**
+     * La institución ve las órdenes de sus equipos; el técnico, las suyas.
+     */
+    public function restringirVisibilidad(Builder $consulta, User $usuario): void
+    {
+        match (true) {
+            $usuario->esInstitucion() => $consulta->where($this->qualifyColumn('empresa_id'), $usuario->empresa_id ?? 0),
+            $usuario->esTecnico() => $consulta->where($this->qualifyColumn('tecnico_id'), $usuario->id),
+            default => $consulta->whereRaw('1 = 0'),
+        };
     }
 
     /** @return HasOne<Reporte, $this> */

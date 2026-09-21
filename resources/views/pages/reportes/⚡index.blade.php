@@ -7,6 +7,7 @@ use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -179,11 +180,15 @@ new #[Title('Reportes')] class extends Component {
 
     public function confirmarEliminacion(int $id): void
     {
+        abort_unless(Gate::allows('gestionar-reportes'), 403);
+
         $this->reporteAEliminar = $id;
     }
 
     public function eliminar(): void
     {
+        abort_unless(Gate::allows('gestionar-reportes'), 403);
+
         if ($this->reporteAEliminar === null) {
             return;
         }
@@ -541,15 +546,17 @@ new #[Title('Reportes')] class extends Component {
                                         </a>
                                     @endif
 
-                                    <button
-                                        type="button"
-                                        class="eq-icon-btn hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
-                                        wire:click.stop="confirmarEliminacion({{ $reporte->id }})"
-                                        x-on:click.stop
-                                        title="Retirar {{ $reporte->codigo() }} del listado"
-                                    >
-                                        <flux:icon name="trash" variant="mini" class="size-4" />
-                                    </button>
+                                    @can('gestionar-reportes')
+                                        <button
+                                            type="button"
+                                            class="eq-icon-btn hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
+                                            wire:click.stop="confirmarEliminacion({{ $reporte->id }})"
+                                            x-on:click.stop
+                                            title="Retirar {{ $reporte->codigo() }} del listado"
+                                        >
+                                            <flux:icon name="trash" variant="mini" class="size-4" />
+                                        </button>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>

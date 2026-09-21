@@ -3,11 +3,13 @@
 use App\Models\Empresa;
 use App\Models\Equipo;
 use App\Models\Mantenimiento;
+use App\Models\User;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -106,7 +108,15 @@ new #[Title('Mantenimientos')] class extends Component {
 
     public string $fecha_ejecucion = '';
 
-    public string $tecnico = '';
+    /** Usuario técnico al que se le asigna la orden. */
+    public string $tecnico_id = '';
+
+    /**
+     * Nombre del técnico escrito a mano en una orden anterior a los usuarios.
+     * Se conserva mientras no se elija un responsable de la lista.
+     */
+    public string $tecnicoLegado = '';
+
 
     public string $motivo = '';
 
@@ -215,6 +225,20 @@ new #[Title('Mantenimientos')] class extends Component {
     }
 
     // ------------------------------------------------------------------
+    // Permisos
+    // ------------------------------------------------------------------
+
+    /**
+     * Planear el trabajo: crear la orden, moverla de fecha, cambiarle el equipo
+     * o el técnico, borrarla. Es cosa de INGSOLMEP.
+     */
+    #[Computed]
+    public function puedeAsignar(): bool
+    {
+        return Gate::allows('asignar-mantenimientos');
+    }
+
+    // ------------------------------------------------------------------
     // Datos derivados
     // ------------------------------------------------------------------
 
@@ -268,6 +292,17 @@ new #[Title('Mantenimientos')] class extends Component {
             ->distinct()
             ->orderBy('tecnico')
             ->pluck('tecnico');
+    }
+
+    /**
+     * Técnicos a los que se les puede asignar una orden.
+     *
+     * @return Collection<int, User>
+     */
+    #[Computed]
+    public function tecnicosDisponibles(): Collection
+    {
+        return User::query()->tecnicos()->get();
     }
 
     /**
@@ -441,6 +476,9 @@ new #[Title('Mantenimientos')] class extends Component {
     {
         $mantenimiento = Mantenimiento::findOrFail($id);
 
+        // Cerrar la orden es ejecutarla: la cierra quien la tiene asignada.
+        abort_unless(Gate::allows('ejecutar-mantenimiento', $mantenimiento), 403);
+
         if (! $mantenimiento->estaAbierto()) {
             return;
         }
@@ -493,6 +531,8 @@ new #[Title('Mantenimientos')] class extends Component {
 
     public function abrirCreacion(string $tipo = 'preventivo'): void
     {
+        abort_unless($this->puedeAsignar, 403);
+
         $this->resetValidation();
         $this->reiniciarFormulario();
 
@@ -506,6 +546,10 @@ new #[Title('Mantenimientos')] class extends Component {
     public function editar(int $id): void
     {
         $mantenimiento = Mantenimiento::findOrFail($id);
+
+        // El técnico abre su propia orden para documentar lo que hizo; lo que
+        // no puede tocar se blinda al guardar, no al abrir.
+        abort_unless(Gate::allows('ejecutar-mantenimiento', $mantenimiento), 403);
 
         // Editar desde la ficha o desde un listado los reemplaza por el formulario.
         $this->mantenimientoVisto = null;
@@ -525,6 +569,10 @@ new #[Title('Mantenimientos')] class extends Component {
 
         $this->presenta_novedad = (bool) $mantenimiento->presenta_novedad;
         $this->novedad = (string) ($mantenimiento->novedad ?? '');
+
+        $this->tecnico_id = (string) ($mantenimiento->tecnico_id ?? '');
+        // Sólo hay nombre heredado cuando la orden es anterior a los usuarios.
+        $this->tecnicoLegado = $mantenimiento->tecnico_id ? '' : (string) ($mantenimiento->tecnico ?? '');
 
         $this->fecha_programada = $mantenimiento->fecha_programada->format('Y-m-d');
         $this->fecha_ejecucion = $mantenimiento->fecha_ejecucion?->format('Y-m-d') ?? '';
@@ -556,9 +604,21 @@ new #[Title('Mantenimientos')] class extends Component {
 
     public function guardar(): void
     {
+        $mantenimiento = $this->mantenimientoId
+            ? Mantenimiento::findOrFail($this->mantenimientoId)
+            : new Mantenimiento;
+
+        abort_unless(
+            $mantenimiento->exists
+                ? Gate::allows('ejecutar-mantenimiento', $mantenimiento)
+                : $this->puedeAsignar,
+            403,
+        );
+
         $this->validate($this->reglas(), [], $this->etiquetas());
 
         $equipo = Equipo::findOrFail((int) $this->equipo_id);
+        $responsable = $this->tecnico_id !== '' ? User::find((int) $this->tecnico_id) : null;
 
         $datos = [
             'equipo_id' => $equipo->id,
@@ -579,15 +639,30 @@ new #[Title('Mantenimientos')] class extends Component {
                 $this->accesorios_estado,
                 static fn (string $estado): bool => $estado !== '',
             ),
+            'tecnico_id' => $responsable?->id,
+            // El nombre queda copiado en la orden: es el que sale impreso en el
+            // reporte firmado y no debe cambiar porque el usuario se renombre.
+            'tecnico' => $responsable?->name ?: (trim($this->tecnicoLegado) ?: null),
         ];
 
         foreach ($this->camposDirectos() as $campo) {
             $datos[$campo] = trim((string) $this->{$campo}) ?: null;
         }
 
-        $mantenimiento = $this->mantenimientoId
-            ? Mantenimiento::findOrFail($this->mantenimientoId)
-            : new Mantenimiento;
+        // El técnico documenta el trabajo; la planeación de la orden —a qué
+        // equipo, de qué tipo, para cuándo y de quién es— sigue intacta aunque
+        // el formulario le llegue con esos campos.
+        if (! $this->puedeAsignar) {
+            $datos = [...$datos, ...[
+                'equipo_id' => $mantenimiento->equipo_id,
+                'empresa_id' => $mantenimiento->empresa_id,
+                'tipo' => $mantenimiento->tipo,
+                'prioridad' => $mantenimiento->prioridad,
+                'fecha_programada' => $mantenimiento->fecha_programada,
+                'tecnico_id' => $mantenimiento->tecnico_id,
+                'tecnico' => $mantenimiento->tecnico,
+            ]];
+        }
 
         $mantenimiento->fill($datos)->save();
 
@@ -641,6 +716,8 @@ new #[Title('Mantenimientos')] class extends Component {
 
     public function confirmarEliminacion(int $id): void
     {
+        abort_unless($this->puedeAsignar, 403);
+
         // Eliminar desde la ficha la reemplaza por la confirmación.
         $this->mantenimientoVisto = null;
 
@@ -649,6 +726,8 @@ new #[Title('Mantenimientos')] class extends Component {
 
     public function eliminar(): void
     {
+        abort_unless($this->puedeAsignar, 403);
+
         if ($this->mantenimientoAEliminar === null) {
             return;
         }
@@ -794,7 +873,7 @@ new #[Title('Mantenimientos')] class extends Component {
     private function camposDirectos(): array
     {
         return [
-            'prioridad', 'fecha_programada', 'fecha_ejecucion', 'tecnico',
+            'prioridad', 'fecha_programada', 'fecha_ejecucion',
             'motivo', 'descripcion', 'repuestos', 'observaciones',
         ];
     }
@@ -803,8 +882,8 @@ new #[Title('Mantenimientos')] class extends Component {
     {
         $this->reset([
             'mantenimientoId', 'equipo_id', 'buscarEquipo', 'tipo', 'estado', 'prioridad',
-            'fecha_programada', 'fecha_ejecucion', 'tecnico', 'motivo',
-            'descripcion', 'repuestos', 'observaciones', 'costo',
+            'fecha_programada', 'fecha_ejecucion', 'tecnico_id', 'tecnicoLegado',
+            'motivo', 'descripcion', 'repuestos', 'observaciones', 'costo',
             'presenta_novedad', 'novedad',
         ]);
 
@@ -827,7 +906,11 @@ new #[Title('Mantenimientos')] class extends Component {
             'fecha_programada' => ['required', 'date'],
             // Una orden ejecutada tiene que decir cuándo se ejecutó.
             'fecha_ejecucion' => [$this->estado === 'ejecutado' ? 'required' : 'nullable', 'date'],
-            'tecnico' => ['nullable', 'string', 'max:255'],
+            // Sólo un usuario de rol técnico puede quedar como responsable.
+            'tecnico_id' => [
+                'nullable',
+                Rule::exists('users', 'id')->where(fn ($consulta) => $consulta->where('rol', 'tecnico')),
+            ],
             // El correctivo nace de una falla: sin ella la orden no se entiende.
             'motivo' => [$this->tipo === 'correctivo' ? 'required' : 'nullable', 'string', 'max:2000'],
             'descripcion' => ['nullable', 'string', 'max:2000'],
@@ -854,7 +937,7 @@ new #[Title('Mantenimientos')] class extends Component {
             'estado' => 'estado de la orden',
             'fecha_programada' => 'fecha programada',
             'fecha_ejecucion' => 'fecha de ejecución',
-            'tecnico' => 'técnico responsable',
+            'tecnico_id' => 'técnico responsable',
             'motivo' => 'falla o motivo reportado',
             'descripcion' => 'trabajo a realizar',
             'repuestos' => 'repuestos utilizados',
@@ -878,10 +961,12 @@ new #[Title('Mantenimientos')] class extends Component {
             </p>
         </div>
 
-        <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
-            <flux:icon name="plus" variant="mini" class="size-4" />
-            Asignar mantenimiento
-        </button>
+        @can('asignar-mantenimientos')
+            <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
+                <flux:icon name="plus" variant="mini" class="size-4" />
+                Asignar mantenimiento
+            </button>
+        @endcan
     </div>
 
     {{-- ───────────────── Indicadores ───────────────── --}}
@@ -1178,14 +1263,16 @@ new #[Title('Mantenimientos')] class extends Component {
                             <td class="px-4 py-3 align-top">
                                 <div class="flex items-center gap-1">
                                     @if ($mantenimiento->estaAbierto())
-                                        <button
-                                            type="button"
-                                            class="eq-icon-btn hover:!bg-emerald-50 hover:!text-emerald-600 dark:hover:!bg-emerald-500/10 dark:hover:!text-emerald-400"
-                                            wire:click.stop="marcarEjecutado({{ $mantenimiento->id }})"
-                                            title="Marcar {{ $mantenimiento->codigo() }} como ejecutado hoy"
-                                        >
-                                            <flux:icon name="check-circle" variant="mini" class="size-4" />
-                                        </button>
+                                        @can('ejecutar-mantenimiento', $mantenimiento)
+                                            <button
+                                                type="button"
+                                                class="eq-icon-btn hover:!bg-emerald-50 hover:!text-emerald-600 dark:hover:!bg-emerald-500/10 dark:hover:!text-emerald-400"
+                                                wire:click.stop="marcarEjecutado({{ $mantenimiento->id }})"
+                                                title="Marcar {{ $mantenimiento->codigo() }} como ejecutado hoy"
+                                            >
+                                                <flux:icon name="check-circle" variant="mini" class="size-4" />
+                                            </button>
+                                        @endcan
                                     @endif
 
                                     {{-- Una orden ejecutada ya puede reportarse; el enlace no debe
@@ -1211,18 +1298,22 @@ new #[Title('Mantenimientos')] class extends Component {
                                         </a>
                                     @endif
 
-                                    <button type="button" class="eq-icon-btn" wire:click.stop="editar({{ $mantenimiento->id }})" title="Editar {{ $mantenimiento->codigo() }}">
-                                        <flux:icon name="pencil-square" variant="mini" class="size-4" />
-                                    </button>
+                                    @can('ejecutar-mantenimiento', $mantenimiento)
+                                        <button type="button" class="eq-icon-btn" wire:click.stop="editar({{ $mantenimiento->id }})" title="Editar {{ $mantenimiento->codigo() }}">
+                                            <flux:icon name="pencil-square" variant="mini" class="size-4" />
+                                        </button>
+                                    @endcan
 
-                                    <button
-                                        type="button"
-                                        class="eq-icon-btn hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
-                                        wire:click.stop="confirmarEliminacion({{ $mantenimiento->id }})"
-                                        title="Eliminar {{ $mantenimiento->codigo() }}"
-                                    >
-                                        <flux:icon name="trash" variant="mini" class="size-4" />
-                                    </button>
+                                    @can('asignar-mantenimientos')
+                                        <button
+                                            type="button"
+                                            class="eq-icon-btn hover:!bg-rose-50 hover:!text-rose-600 dark:hover:!bg-rose-500/10 dark:hover:!text-rose-400"
+                                            wire:click.stop="confirmarEliminacion({{ $mantenimiento->id }})"
+                                            title="Eliminar {{ $mantenimiento->codigo() }}"
+                                        >
+                                            <flux:icon name="trash" variant="mini" class="size-4" />
+                                        </button>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>
@@ -1241,7 +1332,7 @@ new #[Title('Mantenimientos')] class extends Component {
                                     </p>
                                     @if ($this->hayFiltrosActivos)
                                         <button type="button" class="eq-btn eq-btn-ghost" wire:click="limpiarFiltros">Limpiar filtros</button>
-                                    @else
+                                    @elsecan('asignar-mantenimientos')
                                         <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
                                             <flux:icon name="plus" variant="mini" class="size-4" /> Asignar mantenimiento
                                         </button>
@@ -1267,7 +1358,7 @@ new #[Title('Mantenimientos')] class extends Component {
         @include('pages.mantenimientos.partials.modal-formulario', [
             'equiposDisponibles' => $this->equiposParaFormulario,
             'equipo' => $this->equipoSeleccionado,
-            'tecnicosSugeridos' => $this->tecnicos,
+            'tecnicosDisponibles' => $this->tecnicosDisponibles,
             'topeEquipos' => $this::TOPE_EQUIPOS,
         ])
     @endteleport

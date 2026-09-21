@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use App\Contracts\RestringiblePorRol;
+use App\Models\Scopes\Visibilidad;
+use App\Support\SemaforoMantenimiento;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
@@ -34,7 +39,8 @@ use Illuminate\Support\Facades\Storage;
     'voltios', 'temperatura', 'presion', 'peso', 'velocidad', 'tecnologia_predominante',
     'subtareas', 'accesorios_estado', 'componentes', 'observaciones_ot',
 ])]
-class Equipo extends Model
+#[ScopedBy(Visibilidad::class)]
+class Equipo extends Model implements RestringiblePorRol
 {
     use SoftDeletes;
 
@@ -167,6 +173,48 @@ class Equipo extends Model
     public function mantenimientos(): HasMany
     {
         return $this->hasMany(Mantenimiento::class);
+    }
+
+    /**
+     * La orden abierta más próxima: la que dice cuándo le toca al equipo.
+     *
+     * Va como relación y no como consulta suelta para poder precargarla con el
+     * listado, donde cada tarjeta pinta su semáforo.
+     *
+     * @return HasOne<Mantenimiento, $this>
+     */
+    public function proximoMantenimiento(): HasOne
+    {
+        return $this->hasOne(Mantenimiento::class)->ofMany(
+            ['fecha_programada' => 'min', 'id' => 'min'],
+            fn (Builder $abiertas) => $abiertas->whereIn('estado', Mantenimiento::ESTADOS_ABIERTOS),
+        );
+    }
+
+    /**
+     * Cuánto le falta al equipo para su próximo mantenimiento, o null si no hay
+     * fecha de la que partir. Ver {@see SemaforoMantenimiento}.
+     */
+    public function semaforoMantenimiento(): ?SemaforoMantenimiento
+    {
+        return SemaforoMantenimiento::para($this);
+    }
+
+    /**
+     * La institución ve el inventario que se le asignó. El técnico ve los
+     * equipos sobre los que tiene o tuvo una orden: son los que necesita
+     * consultar antes de intervenirlos.
+     */
+    public function restringirVisibilidad(Builder $consulta, User $usuario): void
+    {
+        match (true) {
+            $usuario->esInstitucion() => $consulta->where($this->qualifyColumn('empresa_id'), $usuario->empresa_id ?? 0),
+            $usuario->esTecnico() => $consulta->whereIn($this->qualifyColumn('id'), Mantenimiento::query()
+                ->withoutGlobalScope(Visibilidad::class)
+                ->where('mantenimientos.tecnico_id', $usuario->id)
+                ->select('mantenimientos.equipo_id')),
+            default => $consulta->whereRaw('1 = 0'),
+        };
     }
 
     /**

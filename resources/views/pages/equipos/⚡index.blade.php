@@ -3,12 +3,14 @@
 use App\Models\Area;
 use App\Models\Empresa;
 use App\Models\Equipo;
+use App\Models\Mantenimiento;
 use App\Models\Marca;
 use App\Models\Modelo;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -234,6 +236,9 @@ new #[Title('Equipos')] class extends Component {
 
     public ?int $equipoVisto = null;
 
+    /** Pestaña abierta en la ficha. Ver {@see self::PESTANAS_FICHA}. */
+    public string $fichaPestana = 'informacion';
+
     public string $listadoVisto = '';
 
     /**
@@ -270,6 +275,24 @@ new #[Title('Equipos')] class extends Component {
     /** Máximo de filas que muestra el modal de listado antes de recortar. */
     public const TOPE_LISTADO = 100;
 
+    /**
+     * Las dos preguntas que se le hacen a un equipo: qué es y qué se le ha
+     * hecho. Cada una es una pestaña de la ficha.
+     *
+     * @var array<string, array{titulo: string, icono: string}>
+     */
+    public const PESTANAS_FICHA = [
+        'informacion' => ['titulo' => 'Información', 'icono' => 'clipboard-document-list'],
+        'mantenimientos' => ['titulo' => 'Mantenimientos', 'icono' => 'wrench-screwdriver'],
+    ];
+
+    /**
+     * Máximo de órdenes que lista el historial de la ficha. La ficha resuelve
+     * «qué se le ha hecho a este equipo», no reemplaza al módulo de
+     * mantenimientos: pasado el tope se remite allí, que tiene filtros.
+     */
+    public const TOPE_HISTORIAL = 50;
+
     public function mount(): void
     {
         $this->reiniciarFormulario();
@@ -286,7 +309,7 @@ new #[Title('Equipos')] class extends Component {
         $columna = array_key_exists($this->ordenarPor, self::ORDENABLES) ? $this->ordenarPor : 'created_at';
 
         return Equipo::query()
-            ->with(['empresa', 'area', 'marca', 'modelo'])
+            ->with(['empresa', 'area', 'marca', 'modelo', 'proximoMantenimiento'])
             ->when($this->buscar !== '', function (Builder $consulta): void {
                 $termino = '%'.$this->buscar.'%';
 
@@ -420,7 +443,39 @@ new #[Title('Equipos')] class extends Component {
             return null;
         }
 
-        return Equipo::with(['empresa', 'area', 'marca', 'modelo'])->find($this->equipoVisto);
+        return Equipo::with(['empresa', 'area', 'marca', 'modelo', 'proximoMantenimiento'])->find($this->equipoVisto);
+    }
+
+    /**
+     * Historial de órdenes del equipo abierto, de la más reciente a la más
+     * antigua. Se ordena por la fecha en que se intervino el equipo y no por la
+     * de programación: el historial cuenta lo que pasó, no lo que se planeó.
+     *
+     * @return Collection<int, Mantenimiento>
+     */
+    #[Computed]
+    public function historialMantenimientos(): Collection
+    {
+        if ($this->equipoVisto === null || $this->fichaPestana !== 'mantenimientos') {
+            return collect();
+        }
+
+        return Mantenimiento::query()
+            ->where('equipo_id', $this->equipoVisto)
+            ->with('responsable')
+            ->orderByRaw('COALESCE(fecha_ejecucion, fecha_programada) desc')
+            ->orderByDesc('id')
+            ->limit(self::TOPE_HISTORIAL)
+            ->get();
+    }
+
+    /** Total de órdenes del equipo, para saber si el historial viene recortado. */
+    #[Computed]
+    public function totalHistorial(): int
+    {
+        return $this->equipoVisto === null
+            ? 0
+            : Mantenimiento::where('equipo_id', $this->equipoVisto)->count();
     }
 
     /**
@@ -536,8 +591,20 @@ new #[Title('Equipos')] class extends Component {
         $this->resetPage();
     }
 
+    /**
+     * Mantener la hoja de vida del equipo es cosa de INGSOLMEP: la institución
+     * la consulta y el técnico la lee antes de intervenir.
+     */
+    #[Computed]
+    public function puedeGestionar(): bool
+    {
+        return Gate::allows('gestionar-equipos');
+    }
+
     public function alternarActivo(int $id): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         $equipo = Equipo::findOrFail($id);
         $equipo->activo = ! $equipo->activo;
         $equipo->save();
@@ -557,6 +624,14 @@ new #[Title('Equipos')] class extends Component {
     public function verEquipo(int $id): void
     {
         $this->equipoVisto = $id;
+        $this->fichaPestana = 'informacion';
+    }
+
+    public function verPestanaFicha(string $pestana): void
+    {
+        if (array_key_exists($pestana, self::PESTANAS_FICHA)) {
+            $this->fichaPestana = $pestana;
+        }
     }
 
     public function cerrarDetalle(): void
@@ -584,12 +659,16 @@ new #[Title('Equipos')] class extends Component {
 
     public function abrirCreacion(): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         $this->reiniciarFormulario();
         $this->mostrarFormulario = true;
     }
 
     public function editar(int $id): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         $equipo = Equipo::with(['area', 'marca', 'modelo'])->findOrFail($id);
 
         // Editar desde la vista de detalle la reemplaza por el asistente.
@@ -674,8 +753,15 @@ new #[Title('Equipos')] class extends Component {
     }
 
     /**
-     * Salta a una fase concreta. Hacia adelante sólo si las fases
-     * intermedias ya están completas.
+     * Salta a una fase concreta.
+     *
+     * Registrando, hacia adelante sólo si las fases intermedias ya están
+     * completas: el asistente guía el alta. Editando se navega libremente,
+     * porque el cambio puede estar en cualquier fase y exigir el repaso de
+     * las anteriores sólo estorba; parte del inventario entró por importación
+     * y arrastra campos obligatorios en blanco que bloquearían el salto.
+     * Lo que no puede quedar a medias es el guardado, y de eso ya se encarga
+     * {@see guardar()}, que valida las cinco fases antes de escribir.
      */
     public function irAPaso(int $destino): void
     {
@@ -683,11 +769,13 @@ new #[Title('Equipos')] class extends Component {
             return;
         }
 
-        if ($destino > $this->paso) {
+        if ($this->equipoId === null && $destino > $this->paso) {
             for ($intermedio = $this->paso; $intermedio < $destino; $intermedio++) {
                 $this->validate($this->reglasDelPaso($intermedio), [], $this->etiquetas());
             }
         }
+
+        $this->resetValidation();
 
         $this->paso = $destino;
         $this->pasoMaximo = max($this->pasoMaximo, $destino);
@@ -695,6 +783,8 @@ new #[Title('Equipos')] class extends Component {
 
     public function guardar(): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         foreach (array_keys(self::PASOS) as $numero) {
             try {
                 $this->validate($this->reglasDelPaso($numero), [], $this->etiquetas());
@@ -806,6 +896,8 @@ new #[Title('Equipos')] class extends Component {
 
     public function confirmarEliminacion(int $id): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         // Eliminar desde la vista de detalle la reemplaza por la confirmación.
         $this->equipoVisto = null;
 
@@ -814,6 +906,8 @@ new #[Title('Equipos')] class extends Component {
 
     public function eliminar(): void
     {
+        abort_unless($this->puedeGestionar, 403);
+
         if ($this->equipoAEliminar === null) {
             return;
         }
@@ -985,10 +1079,12 @@ new #[Title('Equipos')] class extends Component {
             </p>
         </div>
 
-        <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
-            <flux:icon name="plus" variant="mini" class="size-4" />
-            Añadir equipo
-        </button>
+        @can('gestionar-equipos')
+            <button type="button" class="eq-btn eq-btn-accent" wire:click="abrirCreacion">
+                <flux:icon name="plus" variant="mini" class="size-4" />
+                Añadir equipo
+            </button>
+        @endcan
     </div>
 
     {{-- ───────────────── Indicadores ───────────────── --}}
@@ -1202,7 +1298,14 @@ new #[Title('Equipos')] class extends Component {
     @endteleport
 
     @teleport('body')
-        @include('pages.equipos.partials.modal-detalle', ['equipo' => $this->equipoDetalle])
+        @include('pages.equipos.partials.modal-detalle', [
+            'equipo' => $this->equipoDetalle,
+            'pestanas' => $this::PESTANAS_FICHA,
+            'pestanaActiva' => $this->fichaPestana,
+            'historial' => $this->historialMantenimientos,
+            'totalHistorial' => $this->totalHistorial,
+            'topeHistorial' => $this::TOPE_HISTORIAL,
+        ])
     @endteleport
 
     @teleport('body')
